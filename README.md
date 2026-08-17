@@ -5,10 +5,12 @@
   <br>
   <img src="https://img.shields.io/github/last-commit/dikasurain/DimoTalk" alt="last-commit" />
 </p>
-#
-<br/>
 <h1 align="center">功能描述</h1>
+<p>
+当前软件可能分为
 
+  
+</p>
 
 
 
