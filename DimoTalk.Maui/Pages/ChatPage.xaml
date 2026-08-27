@@ -23,6 +23,7 @@
                 <Entry x:Name="InputEntry" Placeholder="输入消息..." ReturnType="Send"
                        Completed="OnSendClicked" ClearButtonVisibility="WhileEditing" />
             </Border>
+            <Button x:Name="VoiceButton" Text="语音" Clicked="OnVoiceClicked" BackgroundColor="#FF9800" />
             <Button x:Name="SendButton" Text="发送" Clicked="OnSendClicked" />
         </HorizontalStackLayout>
     </Grid>

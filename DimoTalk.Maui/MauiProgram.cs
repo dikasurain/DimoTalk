@@ -3,6 +3,7 @@ using DimoTalk.Maui.Pages;
 using DimoTalk.Maui.Services;
 using DimoTalk.Maui.Services.AI;
 using DimoTalk.Maui.Services.Memory;
+using DimoTalk.Maui.Services.Voice;
 
 namespace DimoTalk.Maui;
 
@@ -19,35 +20,49 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // 注册 MemoryManager (单例，延迟初始化)
+        // MemoryManager（单例，延迟初始化）
         var memoryManager = new Lazy<MemoryManager?>(() => MemoryManager.CreateAsync().GetAwaiter().GetResult());
         builder.Services.AddSingleton(sp => memoryManager.Value);
 
-        // OpenAIClientFactory: 每次请求时读取最新 API Key
-        builder.Services.AddSingleton(sp =>
-        {
-            var key = Preferences.Get("openai_api_key", string.Empty);
-            return string.IsNullOrEmpty(key) ? null : new OpenAIClient(key);
-        });
+        // AI 客户端：内部按需读取最新配置，无需 DI 缓存
+        builder.Services.AddSingleton<OpenAIClient>();
+        builder.Services.AddSingleton<IAsrService, WhisperAsrService>();
+        builder.Services.AddSingleton<ITtsService, OpenAITtsService>();
+        builder.Services.AddSingleton<IAudioPlayer, AudioPlayer>();
+        builder.Services.AddSingleton<IWakeWordDetector, VoskWakeWordDetector>();
 
-        // ChatService 工厂: 每次取新的 ChatService 以读取最新 API Key
+        // ChatService：取最新 OpenAIClient（注入的实例会读取最新 Preferences）
         builder.Services.AddSingleton<ChatService>(sp =>
         {
             var mm = sp.GetService<MemoryManager?>();
-            var key = Preferences.Get("openai_api_key", string.Empty);
-            if (mm == null || string.IsNullOrEmpty(key)) return null!;
-            return new ChatService(mm, new OpenAIClient(key));
+            var ai = sp.GetRequiredService<OpenAIClient>();
+            if (mm == null) return null!;
+            return new ChatService(mm, ai);
+        });
+
+        // VoiceConversationManager
+        builder.Services.AddSingleton<VoiceConversationManager>(sp =>
+        {
+            var mm = sp.GetService<MemoryManager?>();
+            var ai = sp.GetRequiredService<OpenAIClient>();
+            if (mm == null) return null!;
+            var wake = sp.GetRequiredService<IWakeWordDetector>();
+            var asr = sp.GetRequiredService<IAsrService>();
+            var tts = sp.GetRequiredService<ITtsService>();
+            var player = sp.GetRequiredService<IAudioPlayer>();
+            var chat = sp.GetRequiredService<ChatService>();
+            return new VoiceConversationManager(wake, asr, tts, player, chat);
         });
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<ChatPage>(sp =>
         {
             var chatService = sp.GetService<ChatService>();
-            return new ChatPage(chatService, () => Preferences.Get("openai_api_key", string.Empty));
+            var voice = sp.GetService<VoiceConversationManager>();
+            return new ChatPage(chatService, voice, () => Preferences.Get("openai_api_key", string.Empty));
         });
         builder.Services.AddTransient<SettingsPage>();
 
-        var app = builder.Build();
-        return app;
+        return builder.Build();
     }
 }

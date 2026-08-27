@@ -61,6 +61,20 @@ public class VoiceConversationManager : IAsyncDisposable
         await _wakeWordDetector.StartAsync(OnWakeWordDetected, _cts.Token);
     }
 
+    /// <summary>停止语音对话（用户点击"停止"按钮或应用进入后台）</summary>
+    public async Task StopAsync()
+    {
+        if (_cts != null)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = null;
+        }
+
+        try { await _wakeWordDetector.StopAsync(); } catch { }
+        SetState(VoiceState.Idle);
+    }
+
     /// <summary>
     /// 唤醒词触发：播放提示音 + 切换到录音状态
     /// </summary>

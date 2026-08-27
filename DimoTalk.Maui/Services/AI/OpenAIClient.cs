@@ -1,35 +1,31 @@
 using System.Text;
-using OpenAI;
 using OpenAI.Chat;
-using OpenAI.Embeddings;
-using System.ClientModel;
 using DimoTalk.Maui.Config;
+using DimoTalk.Maui.Models;
 
 namespace DimoTalk.Maui.Services.AI;
 
+/// <summary>
+/// 对话客户端：每次调用时读取最新 UserAiConfig 动态构造 ChatClient
+/// 支持任意 OpenAI 兼容 API（OpenAI / DeepSeek / Moonshot / Zhipu / Ollama / 自定义）
+/// </summary>
 public class OpenAIClient
 {
-    private readonly ChatClient _chatClient;
-    private readonly EmbeddingClient _embeddingClient;
-
-    public OpenAIClient(string apiKey)
-    {
-        var credential = new ApiKeyCredential(apiKey);
-        var options = new OpenAIClientOptions { Endpoint = new Uri("https://api.openai.com/v1") };
-        _chatClient = new ChatClient(AppConfig.DefaultModel, credential, options);
-        _embeddingClient = new EmbeddingClient(AppConfig.DefaultEmbeddingModel, credential, options);
-    }
+    /// <summary>取最新配置（每次调用都读，方便用户切换服务商后立即生效）</summary>
+    public UserAiConfig Config => UserAiConfig.Load();
 
     public async Task<string> ChatAsync(List<ChatMessage> messages, double temperature = 0.7)
     {
+        var client = AiClientFactory.CreateChatClient(Config);
         var options = new ChatCompletionOptions { Temperature = (float)temperature };
-        var completion = await _chatClient.CompleteChatAsync(messages, options);
+        var completion = await client.CompleteChatAsync(messages, options);
         return completion.Value.Content[0].Text;
     }
 
     public async Task<float[]> EmbedAsync(string input)
     {
-        var embedding = await _embeddingClient.GenerateEmbeddingAsync(input);
+        var client = AiClientFactory.CreateEmbeddingClient(Config);
+        var embedding = await client.GenerateEmbeddingAsync(input);
         return embedding.Value.ToFloats().ToArray();
     }
 
