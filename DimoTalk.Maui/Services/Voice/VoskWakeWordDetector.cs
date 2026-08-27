@@ -22,6 +22,24 @@ public class VoskWakeWordDetector : IWakeWordDetector
     /// <param name="modelPath">Vosk 中文声学模型目录路径（如 vosk-model-cn-0.22）</param>
     public VoskWakeWordDetector(string modelPath) => _modelPath = modelPath;
 
+    /// <summary>使用默认模型名（vosk-model-small-cn-0.22），自动解析应用目录下的相对路径</summary>
+    public VoskWakeWordDetector() : this(ResolveDefaultModelPath()) { }
+
+    private static string ResolveDefaultModelPath()
+    {
+        // 优先从应用输出目录加载（开发期）
+        var candidate = Path.Combine(AppContext.BaseDirectory, "vosk-model-small-cn-0.22");
+        if (Directory.Exists(candidate)) return candidate;
+
+        // Android/iOS：从 MAUI 资源解压到 AppDataDirectory 后加载
+        var appData = FileSystem.AppDataDirectory;
+        candidate = Path.Combine(appData, "vosk-model-small-cn-0.22");
+        if (Directory.Exists(candidate)) return candidate;
+
+        // 找不到，返回候选路径并让 Model() 抛错
+        return candidate;
+    }
+
     public Task StartAsync(Func<Task> onWakeWordDetected, CancellationToken ct)
     {
         if (_model == null)

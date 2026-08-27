@@ -75,4 +75,13 @@
 		<PackageReference Include="NAudio" Version="2.2.1" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- Vosk 中文小模型：复制到输出目录，运行时按相对路径加载 -->
+		<VoskModelFiles Include="Resources\vosk-model-small-cn-0.22\**\*.*" />
+		<None Include="@(VoskModelFiles)">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>vosk-model-small-cn-0.22\%(RecursiveDir)%(FileName)%(Extension)</Link>
+		</None>
+	</ItemGroup>
+
 </Project>
