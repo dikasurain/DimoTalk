@@ -1,0 +1,28 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Platform
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework
+ios/Flutter/Release.xcconfig
+ios/Flutter/Debug.xcconfig
+ios/Flutter/Profile.xcconfig
+ios/Flutter/Generated.xcconfig
+
+# SQLite DLL
+sqlite3.dll
