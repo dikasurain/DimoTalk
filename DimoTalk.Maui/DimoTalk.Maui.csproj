@@ -76,12 +76,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- Vosk 中文小模型：复制到输出目录，运行时按相对路径加载 -->
+		<!-- Vosk 中文小模型：复制到输出目录（Windows 桌面运行时按相对路径加载） -->
 		<VoskModelFiles Include="Resources\vosk-model-small-cn-0.22\**\*.*" />
 		<None Include="@(VoskModelFiles)">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>vosk-model-small-cn-0.22\%(RecursiveDir)%(FileName)%(Extension)</Link>
 		</None>
+
+		<!-- 同一模型文件同时打包为 MAUI Raw 资源（Android/iOS 从资源解压到 AppDataDirectory 后加载） -->
+		<MauiAsset Include="@(VoskModelFiles)" LogicalName="vosk-model-small-cn-0.22\%(RecursiveDir)%(FileName)%(Extension)" />
 	</ItemGroup>
 
 </Project>
