@@ -14,4 +14,11 @@ public static class AppConfig
     public const double LongTermSimilarityThreshold = 0.3;
     public const int MidTermRecallLimit = 3;
     public static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(30);
+
+    // 语音
+    public const string DefaultWakeWord = "滴墨";
+    public const string DefaultTtsVoice = "alloy";
+    public const int MaxRecordingSeconds = 30;
+    public const int SilenceThresholdMs = 2000;
+    public const double SpeechEnergyThreshold = 500.0;
 }

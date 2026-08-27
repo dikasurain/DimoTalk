@@ -288,8 +288,72 @@ Hardwaver/                    # Flutter 项目根（手机客户端）
 - [ ] Prompt 组装器
 
 ### Phase 3：语音能力
-- [ ] 语音输入（microphone + Whisper API）
-- [ ] 语音输出（TTS API / 系统 TTS）
+
+> 当前的核心功能模块。三层架构：唤醒词 → 问答处理 → TTS 语音输出。
+
+#### 3.1 语音交互流程
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  状态机：Idle → Listening → WakeWord → Processing → Reply │
+└────────────────────────────────────────────────────────────┘
+
+[Idle 待机]
+  │ 持续监听麦克风（短帧缓冲）
+  ▼
+[Listening 监听中]
+  │ 用本地唤醒词检测器持续识别关键词（如"滴墨"、"DimoTalk"）
+  │   ├─ Vosk 离线 Kaldi 模型（首选，无网络延迟，零成本）
+  │   └─ 退化为周期性 Whisper API（成本高，仅测试用）
+  ▼ 识别到唤醒词
+[WakeWord 触发]
+  │ 1. 短提示音反馈（如"叮"）确认唤醒
+  │ 2. 切换到主动录音模式（持续录音直到静音 2 秒或超过 30 秒）
+  ▼
+[Processing 处理中]
+  │ 1. ASR：将录音发送至 OpenAI Whisper API 转为文本
+  │ 2. 走 ChatService.SendMessageAsync（三层记忆 + OpenAI GPT）
+  ▼
+[Reply 回复]
+  │ 1. TTS：将 AI 回复文本发送至 OpenAI TTS API 合成语音
+  │ 2. 播放合成音频
+  │ 3. 回到 Listening 状态继续监听唤醒词
+
+[中断条件]
+  - 用户说"停"/"暂停" → 切换到 Idle
+  - 应用进入后台 → Idle
+  - 长时间无唤醒（如 5 分钟） → Idle
+```
+
+#### 3.2 唤醒词检测方案
+
+| 方案 | 优点 | 劣势 | 适用场景 |
+|------|------|------|----------|
+| **Vosk 离线（推荐）** | 零延迟、零成本、离线可用 | 需打包中文声学模型（约 50MB） | 生产环境 |
+| Whisper API 周期检测 | 简单、准确 | 高延迟、高成本、需联网 | 仅开发期验证 |
+| 平台原生 SpeechRecognizer | 系统级、零依赖 | 各平台 API 不一致、关键词过滤麻烦 | 备选 |
+
+#### 3.3 语音能力服务设计
+
+```
+Services/
+├── Voice/
+│   ├── IWakeWordDetector.cs          # 唤醒词检测接口（便于换实现）
+│   ├── VoskWakeWordDetector.cs       # Vosk 实现
+│   ├── WhisperAsrService.cs          # OpenAI Whisper ASR
+│   ├── OpenAITtsService.cs           # OpenAI TTS
+│   ├── AudioPlayer.cs                # 音频播放（含提示音）
+│   └── VoiceConversationManager.cs  # 语音状态机编排
+```
+
+#### 3.4 任务清单
+- [ ] 录音能力（Plugin.Maui.Audio 或平台原生）
+- [ ] Vosk 唤醒词检测集成
+- [ ] Whisper ASR 客户端
+- [ ] OpenAI TTS 客户端
+- [ ] 状态机编排（Idle/Listening/WakeWord/Processing/Reply）
+- [ ] 唤醒提示音与回复播放
+- [ ] Settings 中加入唤醒词与语音开关
 
 ### Phase 4：硬件接入
 - [ ] 设备发现（UDP / mDNS）
