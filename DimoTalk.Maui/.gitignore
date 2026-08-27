@@ -1,0 +1,31 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Visual Studio
+.vs/
+*.vspscc
+*.vssscc
+
+# Rider / VS for Mac
+.idea/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Aa]pp[Pp]ackage/
+
+# Android
+Platforms/Android/bin/
+Platforms/Android/obj/
+
+# Windows
+Platforms/Windows/bin/
+Platforms/Windows/obj/
+
+# Local database (开发时生成)
+*.db
+*.db-shm
+*.db-wal

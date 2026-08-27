@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DimoTalk.Maui.Pages.SettingsPage"
+             Title="设置">
+
+    <ScrollView Padding="16">
+        <VerticalStackLayout Spacing="12">
+            <Label Text="OpenAI API Key" FontSize="18" FontAttributes="Bold" />
+
+            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Entry x:Name="ApiKeyEntry" Placeholder="sk-..." IsPassword="True"
+                       ClearButtonVisibility="WhileEditing" />
+            </Border>
+
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="保存" Clicked="OnSaveClicked" />
+                <Button Text="清除" Clicked="OnClearClicked" />
+            </HorizontalStackLayout>
+
+            <Line HeightRequest="1" Background="LightGray" Margin="0,16" />
+
+            <Label Text="关于记忆系统" FontSize="18" FontAttributes="Bold" />
+            <Label FontSize="14" LineBreakMode="WordWrap" TextColor="Gray">
+                <Label.Text>
+                    本应用使用三层记忆架构：
+                    &#x0a;• 短期：当前对话上下文窗口（最近 20 条）
+                    &#x0a;• 中期：会话结束后自动生成摘要存入 SQLite
+                    &#x0a;• 长期：从对话中提取的用户偏好/事实，向量检索
+                </Label.Text>
+            </Label>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

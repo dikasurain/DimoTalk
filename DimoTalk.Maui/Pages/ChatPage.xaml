@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DimoTalk.Maui.Pages.ChatPage"
+             Title="滴墨讲"
+             BackgroundColor="{StaticResource PageBackground}">
+
+    <Grid RowDefinitions="*,Auto" Padding="8">
+        <CollectionView x:Name="MessagesView" Grid.Row="0" Margin="4">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Frame Padding="14,10" Margin="4" CornerRadius="16" HasShadow="False"
+                           BackgroundColor="{Binding BubbleColor}"
+                           HorizontalOptions="{Binding Alignment}">
+                        <Label Text="{Binding Content}" TextColor="{Binding TextColor}" FontSize="15" />
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <HorizontalStackLayout Grid.Row="1" Spacing="8" Padding="4,4,4,8">
+            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round24,24,24,24" Padding="16,12" HorizontalOptions="Fill">
+                <Entry x:Name="InputEntry" Placeholder="输入消息..." ReturnType="Send"
+                       Completed="OnSendClicked" ClearButtonVisibility="WhileEditing" />
+            </Border>
+            <Button x:Name="SendButton" Text="发送" Clicked="OnSendClicked" />
+        </HorizontalStackLayout>
+    </Grid>
+</ContentPage>
