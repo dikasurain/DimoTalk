@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:sqlite3/sqlite3.dart';
 import '../../models/memory_hit.dart';
@@ -20,6 +21,8 @@ class LongTermMemory {
         last_accessed_at INTEGER,
         created_at INTEGER NOT NULL
       );
+    ''');
+    db.execute('''
       CREATE INDEX IF NOT EXISTS idx_ltm_user
         ON long_term_memories(user_id);
     ''');
@@ -33,14 +36,17 @@ class LongTermMemory {
     double confidence = 1.0,
   }) async {
     final blob = _float32ListToBytes(embedding);
-    _db.insert('long_term_memories', {
-      'user_id': userId,
-      'content': content,
-      'embedding': blob,
-      'source_message_id': sourceMessageId,
-      'confidence': confidence,
-      'created_at': DateTime.now().millisecondsSinceEpoch,
-    });
+    _db.execute(
+      'INSERT INTO long_term_memories (user_id, content, embedding, source_message_id, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        userId,
+        content,
+        blob,
+        sourceMessageId,
+        confidence,
+        DateTime.now().millisecondsSinceEpoch,
+      ],
+    );
   }
 
   Future<List<MemoryHit>> recall({
@@ -49,45 +55,37 @@ class LongTermMemory {
     int topK = AppConfig.longTermTopK,
     double threshold = AppConfig.longTermSimilarityThreshold,
   }) async {
-    final queryBlob = _float32ListToBytes(queryEmbedding);
     final rs = _db.select(
-      _db.prepare('''
-        SELECT id, content, confidence, last_accessed_at,
-               cosine_distance(embedding, ?) AS distance
-        FROM long_term_memories
-        WHERE user_id = ? AND cosine_distance(embedding, ?) < ?
-        ORDER BY distance ASC
-        LIMIT ?
-      '''),
-      [queryBlob, userId, queryBlob, threshold, topK],
+      'SELECT id, content, confidence, last_accessed_at, embedding FROM long_term_memories WHERE user_id = ?',
+      [userId],
     );
 
-    final now = DateTime.now().millisecondsSinceEpoch;
     final hits = <MemoryHit>[];
-    final idsToUpdate = <int>[];
+    final now = DateTime.now().millisecondsSinceEpoch;
 
     for (final row in rs) {
-      final hit = MemoryHit(
+      final storedEmbedding = _bytesToFloat32List(row['embedding'] as Uint8List);
+      final distance = _cosineDistance(queryEmbedding, storedEmbedding);
+      if (distance >= threshold) continue;
+
+      hits.add(MemoryHit(
         id: row['id'] as int,
         content: row['content'] as String,
-        distance: (row['distance'] as num).toDouble(),
+        distance: distance,
         confidence: (row['confidence'] as num).toDouble(),
         lastAccessedAt: DateTime.fromMillisecondsSinceEpoch(
           row['last_accessed_at'] as int? ?? 0,
         ),
-      );
-      hits.add(hit);
-      idsToUpdate.add(hit.id);
-    }
+      ));
 
-    for (final id in idsToUpdate) {
       _db.execute(
         'UPDATE long_term_memories SET last_accessed_at = ? WHERE id = ?',
-        [now, id],
+        [now, row['id']],
       );
     }
 
-    return hits;
+    hits.sort((a, b) => a.distance.compareTo(b.distance));
+    return hits.take(topK).toList();
   }
 
   Future<void> forgetExpired({int days = 90}) async {
@@ -98,6 +96,19 @@ class LongTermMemory {
       'DELETE FROM long_term_memories WHERE confidence < 0.5 AND (last_accessed_at IS NULL OR last_accessed_at < ?)',
       [cutoff],
     );
+  }
+
+  static double _cosineDistance(List<double> a, List<double> b) {
+    if (a.length != b.length) return 1.0;
+    double dot = 0, normA = 0, normB = 0;
+    for (var i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    if (normA == 0 || normB == 0) return 1.0;
+    final similarity = dot / (sqrt(normA) * sqrt(normB));
+    return 1.0 - similarity;
   }
 
   static Uint8List _float32ListToBytes(List<double> values) {

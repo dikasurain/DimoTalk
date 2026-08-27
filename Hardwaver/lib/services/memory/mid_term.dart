@@ -15,6 +15,8 @@ class MidTermMemory {
         created_at INTEGER NOT NULL,
         topic TEXT
       );
+    ''');
+    db.execute('''
       CREATE INDEX IF NOT EXISTS idx_summaries_user_time
         ON conversation_summaries(user_id, created_at);
     ''');
@@ -26,23 +28,15 @@ class MidTermMemory {
     required String summary,
     String? topic,
   }) async {
-    _db.insert('conversation_summaries', {
-      'conversation_id': conversationId,
-      'user_id': userId,
-      'summary': summary,
-      'created_at': DateTime.now().millisecondsSinceEpoch,
-      'topic': topic,
-    });
+    _db.execute(
+      'INSERT INTO conversation_summaries (conversation_id, user_id, summary, created_at, topic) VALUES (?, ?, ?, ?, ?)',
+      [conversationId, userId, summary, DateTime.now().millisecondsSinceEpoch, topic],
+    );
   }
 
   Future<List<String>> recall(String userId, {int limit = 3}) async {
     final rs = _db.select(
-      _db.prepare('''
-        SELECT summary FROM conversation_summaries
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT ?
-      '''),
+      'SELECT summary FROM conversation_summaries WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
       [userId, limit],
     );
     return rs.map((r) => r['summary'] as String).toList();

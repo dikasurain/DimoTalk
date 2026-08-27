@@ -1,11 +1,11 @@
 import 'package:sqlite3/sqlite3.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'dart:ffi';
 import 'package:sqlite3/open.dart';
 
 import '../../config/app_config.dart';
 import '../../models/message.dart';
-import '../../models/conversation.dart';
 import 'short_term.dart';
 import 'mid_term.dart';
 import 'long_term.dart';
@@ -29,7 +29,7 @@ class MemoryManager {
   static Future<MemoryManager> create({
     int shortTermMaxSize = AppConfig.shortTermMaxMessages,
   }) async {
-    open.overrideFor(OperatingSystem.windows, _openWindowsLib);
+    open.overrideFor(OperatingSystem.windows, () => DynamicLibrary.open('sqlite3.dll'));
 
     final dir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(dir.path, 'dimotalk_memory.db');
@@ -77,8 +77,4 @@ class MemoryManager {
   Future<void> dispose() async {
     _db.dispose();
   }
-}
-
-DynamicLibrary _openWindowsLib() {
-  return DynamicLibrary.open('sqlite3.dll');
 }

@@ -1,10 +1,10 @@
-import 'dart:async';
 import 'package:logger/logger.dart';
-import '../memory/memory_manager.dart';
-import '../ai/openai_client.dart';
-import '../ai/prompt_builder.dart';
-import '../../models/message.dart';
-import '../../config/app_config.dart';
+import 'memory/memory_manager.dart';
+import 'ai/openai_client.dart';
+import 'ai/prompt_builder.dart';
+import '../models/message.dart';
+import '../models/memory_hit.dart';
+import '../config/app_config.dart';
 
 class ChatService {
   final MemoryManager _memoryManager;
@@ -35,14 +35,16 @@ class ChatService {
               userId: userId,
               queryEmbedding: e,
             ))
-        .catchError((_) => <MemoryHit>[]));
+        .catchError((_) => <MemoryHit>[]);
 
     final midFuture = _memoryManager.midTerm.recall(
       userId,
       limit: AppConfig.midTermRecallLimit,
     );
 
-    final (ltmHits, midSummaries) = await (ltmFuture, midFuture).wait;
+    final results = await Future.wait([ltmFuture, midFuture]);
+    final ltmHits = results[0] as List<MemoryHit>;
+    final midSummaries = results[1] as List<String>;
 
     final messages = PromptBuilder.toOpenAIMessages(
       userInput: userInput,
