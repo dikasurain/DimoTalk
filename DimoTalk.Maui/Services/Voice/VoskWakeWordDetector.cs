@@ -1,9 +1,11 @@
+#if WINDOWS
+using NAudio.Wave;
 using Vosk;
 
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
-/// Vosk 离线唤醒词检测器
+/// Vosk 离线唤醒词检测器（Windows 桌面实现）
 /// 持续录音 + 在线 Kaldi 模型识别，匹配关键词
 /// </summary>
 public class VoskWakeWordDetector : IWakeWordDetector
@@ -12,6 +14,7 @@ public class VoskWakeWordDetector : IWakeWordDetector
 
     private string _modelPath;
     private Model? _model;
+    private WaveInEvent? _waveIn;
     private Task? _loopTask;
     private CancellationTokenSource? _cts;
     private Func<Task>? _onWake;
@@ -21,87 +24,23 @@ public class VoskWakeWordDetector : IWakeWordDetector
 
     public string WakeWord { get; set; } = "滴墨";
 
-    /// <param name="modelPath">Vosk 中文声学模型目录路径（如 vosk-model-cn-0.22）</param>
     public VoskWakeWordDetector(string modelPath) => _modelPath = modelPath;
 
-    /// <summary>使用默认模型名（vosk-model-small-cn-0.22），自动解析平台路径</summary>
     public VoskWakeWordDetector() : this(ResolveDefaultModelPath()) { }
 
     private static string ResolveDefaultModelPath()
     {
-        // Windows 桌面：从应用输出目录加载（编译时已 CopyToOutputDirectory）
-        if (OperatingSystem.IsWindows())
-        {
-            var candidate = Path.Combine(AppContext.BaseDirectory, ModelDirName);
-            if (Directory.Exists(candidate)) return candidate;
-        }
+        var candidate = Path.Combine(AppContext.BaseDirectory, ModelDirName);
+        if (Directory.Exists(candidate)) return candidate;
 
-        // Android/iOS：从 MAUI Raw 资源解压到 AppDataDirectory 后加载
         var appData = FileSystem.AppDataDirectory;
         return Path.Combine(appData, ModelDirName);
     }
 
-    /// <summary>
-    /// Android/iOS 平台首次启动：从 Raw 资源解压模型文件到 AppDataDirectory
-    /// Windows 不需要（直接读输出目录）
-    /// </summary>
-    public async Task EnsureModelExtractedAsync()
-    {
-        if (OperatingSystem.IsWindows()) return;
-        if (_extracted) return;
-
-        lock (_extractLock)
-        {
-            if (_extracted) return;
-
-            // 检查目标目录是否已解压过（用 README 文件作为标记）
-            var targetDir = _modelPath;
-            var marker = Path.Combine(targetDir, "README");
-            if (File.Exists(marker) && Directory.Exists(targetDir))
-            {
-                _extracted = true;
-                return;
-            }
-
-            Directory.CreateDirectory(targetDir);
-
-            // 列举所有打包的资源文件（按 LogicalName 前缀过滤）
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            var resourceNames = assembly.GetManifestResourceNames()
-                .Where(n => n.Contains(ModelDirName) || n.Replace('/', '\\').Contains(ModelDirName))
-                .ToList();
-
-            foreach (var resourceName in resourceNames)
-            {
-                // 把资源名中的 ModelDirName 之后部分作为相对路径
-                var normalized = resourceName.Replace('/', '\\');
-                var idx = normalized.IndexOf(ModelDirName, StringComparison.Ordinal);
-                if (idx < 0) continue;
-
-                var relPath = normalized.Substring(idx + ModelDirName.Length).TrimStart('\\');
-                if (string.IsNullOrEmpty(relPath)) continue;
-
-                var destPath = Path.Combine(targetDir, relPath);
-                Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-
-                using var stream = assembly.GetManifestResourceStream(resourceName);
-                if (stream == null) continue;
-
-                using var fs = File.Create(destPath);
-                stream.CopyTo(fs);
-            }
-
-            _extracted = true;
-        }
-
-        await Task.CompletedTask;
-    }
+    public Task EnsureModelExtractedAsync() => Task.CompletedTask;  // Windows 直接从输出目录加载
 
     public async Task StartAsync(Func<Task> onWakeWordDetected, CancellationToken ct)
     {
-        // Android/iOS 首次启动需先解压模型
-        await EnsureModelExtractedAsync();
-
         if (_model == null)
         {
             if (!Directory.Exists(_modelPath))
@@ -113,73 +52,49 @@ public class VoskWakeWordDetector : IWakeWordDetector
 
         _onWake = onWakeWordDetected;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-
         _loopTask = Task.Run(() => ListeningLoop(_cts.Token), _cts.Token);
+        await Task.CompletedTask;
     }
 
     private void ListeningLoop(CancellationToken ct)
     {
-#if WINDOWS
-        ListeningLoop_Windows(ct);
-#else
-        ListeningLoop_Android(ct);
-#endif
-    }
-
-#if WINDOWS
-    private void ListeningLoop_Windows(CancellationToken ct)
-    {
-        using var waveIn = new NAudio.Wave.WaveInEvent
+        _waveIn = new WaveInEvent
         {
-            WaveFormat = new NAudio.Wave.WaveFormat(16000, 1),  // Vosk 要求 16kHz 单声道
+            WaveFormat = new WaveFormat(16000, 1),
             BufferMilliseconds = 200,
         };
 
         var rec = new VoskRecognizer(_model!, 16000.0f);
         rec.SetMaxAlternatives(0);
-        rec.AcceptWaveform(new byte[4096], 0);  // 初始化
+        rec.AcceptWaveform(new byte[4096], 0);
 
-        void OnDataAvailable(object? sender, NAudio.Wave.WaveInEventArgs e)
+        void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            if (ct.IsCancellationRequested) { waveIn.StopRecording(); return; }
+            if (ct.IsCancellationRequested) { _waveIn!.StopRecording(); return; }
 
             if (rec.AcceptWaveform(e.Buffer, e.BytesRecorded))
             {
-                var resultJson = rec.Result();
-                if (ContainsWakeWord(resultJson) && _onWake != null) _ = _onWake();
+                if (ContainsWakeWord(rec.Result()) && _onWake != null) _ = _onWake();
             }
             else
             {
-                var partial = rec.PartialResult();
-                if (ContainsWakeWord(partial) && _onWake != null) _ = _onWake();
+                if (ContainsWakeWord(rec.PartialResult()) && _onWake != null) _ = _onWake();
             }
         }
 
-        waveIn.DataAvailable += OnDataAvailable;
-        waveIn.StartRecording();
+        _waveIn.DataAvailable += OnDataAvailable;
+        _waveIn.StartRecording();
 
         while (!ct.IsCancellationRequested) Thread.Sleep(100);
 
-        try { waveIn.StopRecording(); } catch { }
-        waveIn.DataAvailable -= OnDataAvailable;
+        try { _waveIn.StopRecording(); } catch { }
+        _waveIn.DataAvailable -= OnDataAvailable;
     }
-#else
-    private void ListeningLoop_Android(CancellationToken ct)
-    {
-        // Android 录音待实现：用 Android.AudioRecord（16kHz mono PCM）
-        // Vosk 模型已正确解压到 FileSystem.AppDataDirectory/vosk-model-small-cn-0.22/
-        // 下一步用 Platform.Android 项目下的 AudioRecordHelper 接入
-        throw new PlatformNotSupportedException(
-            "Android 平台的 Vosk 录音循环尚未实现。模型已就位，仅缺录音端代码。" +
-            "请用 Android.Media.AudioRecord 提供 16kHz mono PCM 数据后调用 VoskRecognizer.AcceptWaveform。");
-    }
-#endif
 
     private bool ContainsWakeWord(string json)
     {
         if (string.IsNullOrEmpty(json)) return false;
-        var normalized = json.Replace(" ", "");
-        return normalized.Contains(WakeWord);
+        return json.Replace(" ", "").Contains(WakeWord);
     }
 
     public async Task StopAsync()
@@ -196,7 +111,32 @@ public class VoskWakeWordDetector : IWakeWordDetector
     public async ValueTask DisposeAsync()
     {
         await StopAsync();
+        _waveIn?.Dispose();
         _model?.Dispose();
         _disposed = true;
     }
 }
+
+#else
+namespace DimoTalk.Maui.Services.Voice;
+
+/// <summary>
+/// Android/iOS 唤醒词检测器占位实现
+/// Vosk native lib 暂未集成，使用 NoOp 占位避免 DI 容器失败
+/// 后续在 Platforms/Android 下接 Android.Media.AudioRecord + VoskRecognizer 实现
+/// </summary>
+public class VoskWakeWordDetector : IWakeWordDetector
+{
+    public string WakeWord { get; set; } = "滴墨";
+
+    public Task EnsureModelExtractedAsync() => Task.CompletedTask;
+
+    public Task StartAsync(Func<Task> onWakeWordDetected, CancellationToken ct) =>
+        Task.FromException(new PlatformNotSupportedException(
+            "Android 唤醒词检测待实现。需在 Platforms/Android 接入 Vosk native 库 + AudioRecord。"));
+
+    public Task StopAsync() => Task.CompletedTask;
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+#endif

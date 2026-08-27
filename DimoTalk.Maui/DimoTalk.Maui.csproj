@@ -70,9 +70,9 @@
 		<PackageReference Include="OpenAI" Version="2.2.0-beta.3" />
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
-		<PackageReference Include="Vosk" Version="0.3.38" />
+		<PackageReference Include="Vosk" Version="0.3.38" Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'" />
 		<PackageReference Include="Plugin.Maui.Audio" Version="3.1.1" />
-		<PackageReference Include="NAudio" Version="2.2.1" />
+		<PackageReference Include="NAudio" Version="2.2.1" Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'" />
 	</ItemGroup>
 
 	<ItemGroup>

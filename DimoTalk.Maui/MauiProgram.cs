@@ -9,6 +9,25 @@ namespace DimoTalk.Maui;
 
 public static class MauiProgram
 {
+    // 全局共享：异步初始化的 MemoryManager，未就绪时为 null
+    // 通过 InitializeMemoryAsync() 启动后台初始化，避免阻塞 UI 线程导致启动崩溃
+    public static MemoryManager? MemoryInstance { get; private set; }
+
+    public static async Task InitializeMemoryAsync()
+    {
+        if (MemoryInstance != null) return;
+        try
+        {
+            MemoryInstance = await MemoryManager.CreateAsync();
+            System.Diagnostics.Debug.WriteLine("MemoryManager 初始化成功");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MemoryManager 初始化失败: {ex}");
+            // 不抛错，让 UI 能正常显示。功能不可用但不闪退
+        }
+    }
+
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
@@ -20,32 +39,25 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // MemoryManager（单例，延迟初始化）
-        var memoryManager = new Lazy<MemoryManager?>(() => MemoryManager.CreateAsync().GetAwaiter().GetResult());
-        builder.Services.AddSingleton(sp => memoryManager.Value);
+        // MemoryManager 不通过 DI 注入（避免 Shell 模板解析时同步阻塞 UI 线程）
+        // 改为全局静态 + 异步初始化，UI 启动后由 App.OnStart 触发
 
-        // AI 客户端：内部按需读取最新配置，无需 DI 缓存
         builder.Services.AddSingleton<OpenAIClient>();
         builder.Services.AddSingleton<IAsrService, WhisperAsrService>();
         builder.Services.AddSingleton<ITtsService, OpenAITtsService>();
         builder.Services.AddSingleton<IAudioPlayer, AudioPlayer>();
         builder.Services.AddSingleton<IWakeWordDetector, VoskWakeWordDetector>();
 
-        // ChatService：取最新 OpenAIClient（注入的实例会读取最新 Preferences）
+        // ChatService 用工厂方法，启动时 MemoryInstance 可能未就绪，返回降级实例
         builder.Services.AddSingleton<ChatService>(sp =>
         {
-            var mm = sp.GetService<MemoryManager?>();
             var ai = sp.GetRequiredService<OpenAIClient>();
-            if (mm == null) return null!;
-            return new ChatService(mm, ai);
+            return new ChatService(MemoryInstance, ai);
         });
 
-        // VoiceConversationManager
         builder.Services.AddSingleton<VoiceConversationManager>(sp =>
         {
-            var mm = sp.GetService<MemoryManager?>();
             var ai = sp.GetRequiredService<OpenAIClient>();
-            if (mm == null) return null!;
             var wake = sp.GetRequiredService<IWakeWordDetector>();
             var asr = sp.GetRequiredService<IAsrService>();
             var tts = sp.GetRequiredService<ITtsService>();
@@ -63,6 +75,11 @@ public static class MauiProgram
         });
         builder.Services.AddTransient<SettingsPage>();
 
-        return builder.Build();
+        var app = builder.Build();
+
+        // 启动后台异步初始化 MemoryManager（不阻塞 UI）
+        _ = InitializeMemoryAsync();
+
+        return app;
     }
 }
