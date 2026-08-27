@@ -58,6 +58,10 @@ public class VoiceConversationManager : IAsyncDisposable
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         SetState(VoiceState.Listening);
 
+        // Android/iOS 首次启动需先解压模型（内部有去重检查，二次调用是 No-op）
+        if (_wakeWordDetector is VoskWakeWordDetector vosk)
+            await vosk.EnsureModelExtractedAsync();
+
         await _wakeWordDetector.StartAsync(OnWakeWordDetected, _cts.Token);
     }
 

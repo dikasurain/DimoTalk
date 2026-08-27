@@ -1,5 +1,3 @@
-using NAudio.Wave;
-
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
@@ -8,16 +6,19 @@ namespace DimoTalk.Maui.Services.Voice;
 /// </summary>
 public class AudioPlayer : IAudioPlayer, IDisposable
 {
-    private WaveOutEvent? _waveOut;
+#if WINDOWS
+    private NAudio.Wave.WaveOutEvent? _waveOut;
+#endif
     private bool _disposed;
 
     public Task PlayAsync(byte[] audioBytes, CancellationToken ct = default)
     {
+#if WINDOWS
         return Task.Run(() =>
         {
             using var ms = new MemoryStream(audioBytes);
-            using var reader = new Mp3FileReader(ms);
-            _waveOut = new WaveOutEvent();
+            using var reader = new NAudio.Wave.Mp3FileReader(ms);
+            _waveOut = new NAudio.Wave.WaveOutEvent();
             _waveOut.Init(reader);
 
             var tcs = new TaskCompletionSource<bool>();
@@ -27,15 +28,20 @@ public class AudioPlayer : IAudioPlayer, IDisposable
             _waveOut.Play();
             tcs.Task.Wait();
         }, ct);
+#else
+        throw new PlatformNotSupportedException(
+            "Android 平台音频播放待实现。需用 Android.Media.AudioTrack 或 Plugin.Maui.Audio。");
+#endif
     }
 
-    public Task PlayPromptAsync(byte[] promptBytes)
-        => PlayAsync(promptBytes);
+    public Task PlayPromptAsync(byte[] promptBytes) => PlayAsync(promptBytes);
 
     public void Dispose()
     {
         if (_disposed) return;
+#if WINDOWS
         _waveOut?.Dispose();
+#endif
         _disposed = true;
     }
 }

@@ -1,5 +1,3 @@
-using NAudio.Wave;
-
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
@@ -8,28 +6,36 @@ namespace DimoTalk.Maui.Services.Voice;
 /// </summary>
 public class VoiceRecorder
 {
-    private readonly WaveInEvent _waveIn = new()
+#if WINDOWS
+    private readonly NAudio.Wave.WaveInEvent _waveIn = new()
     {
-        WaveFormat = new WaveFormat(16000, 1),
+        WaveFormat = new NAudio.Wave.WaveFormat(16000, 1),
         BufferMilliseconds = 100,
     };
     private readonly List<byte> _buffer = new();
     private DateTime _lastSpeech = DateTime.MinValue;
     private bool _stopped;
+#endif
 
     public event EventHandler<byte[]>? RecordingCompleted;
 
     public void StartRecording()
     {
+#if WINDOWS
         _buffer.Clear();
         _lastSpeech = DateTime.Now;
         _stopped = false;
 
         _waveIn.DataAvailable += OnDataAvailable;
         _waveIn.StartRecording();
+#else
+        throw new PlatformNotSupportedException(
+            "Android 平台录音待实现。模型已就位，需用 Android.Media.AudioRecord 提供录音数据。");
+#endif
     }
 
-    private void OnDataAvailable(object? sender, WaveInEventArgs e)
+#if WINDOWS
+    private void OnDataAvailable(object? sender, NAudio.Wave.WaveInEventArgs e)
     {
         if (_stopped) return;
 
@@ -47,7 +53,6 @@ public class VoiceRecorder
 
     private static bool HasSpeech(byte[] buffer, int length)
     {
-        // 简单能量检测：RMS 阈值
         double sum = 0;
         for (int i = 0; i < length; i += 2)
         {
@@ -55,21 +60,23 @@ public class VoiceRecorder
             sum += sample * sample;
         }
         var rms = Math.Sqrt(sum / (length / 2));
-        return rms > 500;  // 经验阈值
+        return rms > 500;
     }
+#endif
 
     public void Stop()
     {
+#if WINDOWS
         if (_stopped) return;
         _stopped = true;
 
         _waveIn.StopRecording();
         _waveIn.DataAvailable -= OnDataAvailable;
 
-        // 转为 WAV 文件字节数组（PCM + WAV 头）
         var wavBytes = ToWavBytes(_buffer.ToArray());
         RecordingCompleted?.Invoke(this, wavBytes);
         _buffer.Clear();
+#endif
     }
 
     /// <summary>
