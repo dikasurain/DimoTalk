@@ -42,7 +42,8 @@
         </Grid>
 
         <!-- ===== 消息区 ===== -->
-        <CollectionView x:Name="MessagesView" Grid.Row="1" Margin="10,4,10,0">
+        <CollectionView x:Name="MessagesView" Grid.Row="1" Margin="10,4,10,4"
+                        VerticalScrollBarVisibility="Default">
             <CollectionView.EmptyView>
                 <StackLayout Padding="32" VerticalOptions="Center" HorizontalOptions="Center">
                     <!-- 印章式大图标：钤盖进场 + 墨晕呼吸 -->
@@ -129,7 +130,7 @@
         </CollectionView>
 
         <!-- ===== 笔架输入栏 ===== -->
-        <Border Grid.Row="2" Margin="12,8,12,28" Padding="6,5"
+        <Border Grid.Row="2" Margin="12,8,12,50" Padding="6,5"
                 Stroke="{StaticResource Divider}" StrokeThickness="1"
                 StrokeShape="RoundRectangle 4" BackgroundColor="{StaticResource Surface}">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
