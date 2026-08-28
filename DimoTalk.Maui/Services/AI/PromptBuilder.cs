@@ -34,6 +34,23 @@ public static class PromptBuilder
         return messages;
     }
 
+    /// <summary>
+    /// 快问快答模式：零记忆、零上下文、单轮直答。system + user 两条消息，token 最少、响应最快。
+    /// </summary>
+    public static List<ChatMessage> ToQuickMessages(string userInput)
+    {
+        return new List<ChatMessage>
+        {
+            new SystemChatMessage(
+                "你是滴墨讲的快问快答模式。规则：\n" +
+                "1. 直接回答，不寒暄、不铺垫、不复述问题。\n" +
+                "2. 默认一两句话答完；只有用户明确要求展开时才详细说明。\n" +
+                "3. 不知道就直说不知道，不编造。\n" +
+                "4. 不使用任何方言，用标准简体中文。"),
+            new UserChatMessage(userInput),
+        };
+    }
+
     private static string AssembleSystem(string basePrompt, List<string> midTerm, List<MemoryHit> longTerm, string? dialectConstraint)
     {
         var sb = new StringBuilder(basePrompt);

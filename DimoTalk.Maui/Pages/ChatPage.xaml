@@ -9,8 +9,8 @@
 
     <Grid RowDefinitions="Auto,*,Auto">
 
-        <!-- ===== 顶栏：印章 + 品名 ===== -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto" Padding="18,12,18,10">
+        <!-- ===== 顶栏：印章 + 品名 + 模式切换 ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto,Auto" Padding="18,12,18,10">
             <!-- 朱砂印章头像 -->
             <Border x:Name="SealBadge" Grid.Column="0" WidthRequest="42" HeightRequest="42"
                     StrokeThickness="0" StrokeShape="RoundRectangle 6"
@@ -33,16 +33,23 @@
                            TextColor="{StaticResource TextSecondary}"/>
                 </HorizontalStackLayout>
             </VerticalStackLayout>
+            <!-- 对话模式切换：闲聊（记忆+方言） / 快答（单轮直答） -->
+            <Button x:Name="ModeButton" Grid.Column="3" Text="闲聊" Clicked="OnModeClicked"
+                    CornerRadius="4" Padding="12,4" FontSize="12"
+                    BackgroundColor="{StaticResource InkWash}"
+                    TextColor="{StaticResource InkMedium}"
+                    VerticalOptions="Center"/>
             <!-- 右侧竖排装饰字 -->
-            <Label Grid.Column="3" Text="笔墨纸砚" FontSize="10" TextColor="{StaticResource InkFaint}"
+            <Label Grid.Column="4" Text="笔墨纸砚" FontSize="10" TextColor="{StaticResource InkFaint}"
                    Rotation="90" VerticalOptions="Center" Margin="0,0,2,0"/>
             <!-- 底部墨线 -->
-            <BoxView Grid.ColumnSpan="4" Grid.Column="0" HeightRequest="1"
+            <BoxView Grid.ColumnSpan="5" Grid.Column="0" HeightRequest="1"
                      BackgroundColor="{StaticResource Divider}" VerticalOptions="End"/>
         </Grid>
 
         <!-- ===== 消息区 ===== -->
         <CollectionView x:Name="MessagesView" Grid.Row="1" Margin="10,4,10,4"
+                        ItemsUpdatingScrollMode="KeepLastItemInView"
                         VerticalScrollBarVisibility="Default">
             <CollectionView.EmptyView>
                 <StackLayout Padding="32" VerticalOptions="Center" HorizontalOptions="Center">
@@ -68,24 +75,29 @@
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Frame Padding="14,10" HasShadow="False"
-                           BackgroundColor="{Binding BubbleColor}"
-                           HorizontalOptions="{Binding Alignment}"
-                           CornerRadius="4,4,4,12"
-                           Margin="6,3,60,3">
-                        <Frame.Behaviors>
+                    <!-- Border 替代 Frame：单层布局，动态高度测量可靠，长文本不截断 -->
+                    <Border Padding="14,10" StrokeThickness="0"
+                            BackgroundColor="{Binding BubbleColor}"
+                            HorizontalOptions="{Binding Alignment}"
+                            StrokeShape="RoundRectangle 4,4,4,12"
+                            Margin="6,3,60,3">
+                        <Border.Behaviors>
                             <behaviors:BubbleEnterBehavior/>
-                        </Frame.Behaviors>
-                        <Frame.Triggers>
-                            <DataTrigger TargetType="Frame" Binding="{Binding IsUser}" Value="True">
-                                <Setter Property="CornerRadius" Value="4,12,4,4"/>
+                        </Border.Behaviors>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsUser}" Value="True">
+                                <Setter Property="StrokeShape" Value="RoundRectangle 4,12,4,4"/>
                                 <Setter Property="Margin" Value="60,3,6,3"/>
                             </DataTrigger>
-                            <DataTrigger TargetType="Frame" Binding="{Binding IsThinking}" Value="True">
+                            <DataTrigger TargetType="Border" Binding="{Binding IsThinking}" Value="True">
                                 <Setter Property="BackgroundColor" Value="{StaticResource InkWash}"/>
                                 <Setter Property="Margin" Value="6,3,120,3"/>
                             </DataTrigger>
-                        </Frame.Triggers>
+                            <!-- AI 长回复：右侧留白 60→20，多容纳两列文字 -->
+                            <DataTrigger TargetType="Border" Binding="{Binding IsLongContent}" Value="True">
+                                <Setter Property="Margin" Value="6,3,20,3"/>
+                            </DataTrigger>
+                        </Border.Triggers>
                         <VerticalStackLayout Spacing="3">
                             <!-- 思考态：三个墨点循环（IsThinking 时显示） -->
                             <HorizontalStackLayout Spacing="6" Margin="0,4,0,2" IsVisible="False">
@@ -124,7 +136,7 @@
                                    TextColor="{Binding TimeColor}" HorizontalOptions="End"
                                    IsVisible="{Binding ShowContent}"/>
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>

@@ -6,18 +6,18 @@ namespace DimoTalk.Maui.Behaviors;
 /// 气泡浮入动效：气泡进入视口时上浮 + 淡入
 /// CollectionView 虚拟化回收后重新挂载也会触发（滚动回看时有轻微动效）
 /// </summary>
-public class BubbleEnterBehavior : Behavior<Frame>
+public class BubbleEnterBehavior : Behavior<Border>
 {
     private bool _animated;
 
-    protected override void OnAttachedTo(Frame bindable)
+    protected override void OnAttachedTo(Border bindable)
     {
         base.OnAttachedTo(bindable);
         _animated = false;
         _ = InkAnimations.BubbleFloatInAsync(bindable);
     }
 
-    protected override void OnDetachingFrom(Frame bindable)
+    protected override void OnDetachingFrom(Border bindable)
     {
         // 复位，避免回收复用时残留偏移
         bindable.CancelAnimations();

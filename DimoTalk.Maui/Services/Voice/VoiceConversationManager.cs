@@ -237,8 +237,8 @@ public class VoiceConversationManager : IAsyncDisposable
                 return;
             }
 
-            // 2. GPT
-            var reply = await _chatService.SendMessageAsync(GetUserId(), text);
+            // 2. GPT（语音对话强制走闲聊链路：完整记忆 + 方言润色）
+            var reply = await _chatService.SendMessageAsync(GetUserId(), text, forceCasual: true);
 
             // 3. TTS
             SetState(VoiceState.Reply);

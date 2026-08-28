@@ -7,6 +7,9 @@ namespace DimoTalk.Maui.Services;
 
 public class ChatService
 {
+    public const string ChatModeCasual = "chat";
+    public const string ChatModeQuick = "quick";
+
     private readonly MemoryManager _memoryManager;
     private readonly OpenAIClient _ai;
 
@@ -16,8 +19,17 @@ public class ChatService
         _ai = ai;
     }
 
-    public async Task<string> SendMessageAsync(string userId, string userInput)
+    public async Task<string> SendMessageAsync(string userId, string userInput, bool forceCasual = false)
     {
+        // ── 快问快答模式：零记忆、零方言、单轮直答（不污染闲聊上下文） ──
+        // forceCasual：语音对话始终走闲聊链路，不受模式开关影响
+        var mode = Preferences.Default.Get("chat_mode", ChatModeCasual);
+        if (!forceCasual && mode == ChatModeQuick)
+        {
+            return await _ai.ChatAsync(PromptBuilder.ToQuickMessages(userInput));
+        }
+
+        // ── 闲聊模式：完整记忆链路 ──
         var userMsg = new Message { Role = MessageRole.User, Content = userInput, Timestamp = DateTime.Now };
         _memoryManager.AddToShortTerm(userMsg);
 

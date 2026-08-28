@@ -16,6 +16,9 @@ public partial class ChatPage : ContentPage
     private CancellationTokenStartInfo? _sealBreathHandle;
     private CancellationTokenStartInfo? _grindingHandle;
 
+    // 对话模式：闲聊（记忆+方言）/ 快答（单轮直答）
+    private bool _isQuickMode;
+
     public ChatPage(ChatService? chatService, VoiceConversationManager? voiceManager, Func<string> getApiKey)
     {
         InitializeComponent();
@@ -23,6 +26,10 @@ public partial class ChatPage : ContentPage
         _voiceManager = voiceManager;
         _getApiKey = getApiKey;
         MessagesView.ItemsSource = _messages;
+
+        // 恢复上次对话模式
+        _isQuickMode = Preferences.Get("chat_mode", ChatService.ChatModeCasual) == ChatService.ChatModeQuick;
+        ApplyModeUI();
 
         // 顶栏印章常驻呼吸动效
         _sealBreathHandle = InkAnimations.SealBreathing(SealBadge);
@@ -64,6 +71,46 @@ public partial class ChatPage : ContentPage
     }
 
     private void OnEntryUnfocused(object? sender, FocusEventArgs e) { }
+
+    private void OnModeClicked(object? sender, EventArgs e)
+    {
+        // 从闲聊切到快答时，若语音进行中先停止
+        if (!_isQuickMode && _voiceManager is { State: not VoiceState.Idle })
+            _ = StopVoiceIfRunningAsync();
+
+        _isQuickMode = !_isQuickMode;
+        Preferences.Set("chat_mode", _isQuickMode ? ChatService.ChatModeQuick : ChatService.ChatModeCasual);
+        ApplyModeUI();
+    }
+
+    private async Task StopVoiceIfRunningAsync()
+    {
+        if (_voiceManager == null || _voiceManager.State == VoiceState.Idle) return;
+        try
+        {
+            await _voiceManager.StopAsync();
+            VoiceButton.Text = "语音";
+            VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["InkWash"];
+            VoiceButton.TextColor = (Color)Application.Current!.Resources["InkMedium"];
+        }
+        catch { /* 停止失败不阻塞模式切换 */ }
+    }
+
+    /// <summary>按当前模式刷新切换按钮文案与状态栏提示</summary>
+    private void ApplyModeUI()
+    {
+        ModeButton.Text = _isQuickMode ? "快答" : "闲聊";
+        StatusLabel.Text = _isQuickMode ? "快问快答 · 直击要点" : "墨已研好 · 静候落笔";
+        // 快答模式强调速答 → 淡青底；闲聊模式 → 淡墨底
+        ModeButton.BackgroundColor = _isQuickMode
+            ? (Color)Application.Current!.Resources["OnlineGreen"]
+            : (Color)Application.Current!.Resources["InkWash"];
+        ModeButton.TextColor = _isQuickMode ? Colors.White : (Color)Application.Current!.Resources["InkMedium"];
+
+        // 语音对话仅闲聊模式可用
+        VoiceButton.IsEnabled = !_isQuickMode;
+        VoiceButton.Opacity = _isQuickMode ? 0.4 : 1.0;
+    }
 
     private void RefreshList(bool scrollToEnd = true)
     {
@@ -168,7 +215,7 @@ public partial class ChatPage : ContentPage
             VoiceButton.Text = "语音";
             VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["InkWash"];
             VoiceButton.TextColor = (Color)Application.Current!.Resources["InkMedium"];
-            StatusLabel.Text = "墨已研好 · 静候落笔";
+            ApplyModeUI();
         }
     }
 }
@@ -181,6 +228,8 @@ public class ChatBubble
     public bool IsError { get; set; }
     /// <summary>思考态只显示墨点动画，隐藏正文与时间</summary>
     public bool ShowContent => !IsThinking;
+    /// <summary>AI 长回复（超150字）加宽气泡：右侧留白 60→20，提升长文阅读体验</summary>
+    public bool IsLongContent => !IsUser && !IsThinking && Content.Length > 150;
     public DateTime Timestamp { get; init; } = DateTime.Now;
     public string Time => Timestamp.ToString("HH:mm");
 
