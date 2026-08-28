@@ -9,7 +9,7 @@
 
             <!-- 服务商 -->
             <Label Text="服务商" FontSize="18" FontAttributes="Bold" />
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                 <Picker x:Name="ProviderPicker"
                         Title="选择服务商"
                         ItemDisplayBinding="{Binding Name}"
@@ -29,7 +29,7 @@
 
             <!-- API Key -->
             <Label Text="API Key" FontSize="18" FontAttributes="Bold" Margin="0,12,0,0" />
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                 <Entry x:Name="ApiKeyEntry" Placeholder="sk-..." IsPassword="True"
                        ClearButtonVisibility="WhileEditing" />
             </Border>
@@ -38,7 +38,7 @@
             <Label x:Name="EndpointLabel" Text="自定义 Endpoint" FontSize="18" FontAttributes="Bold"
                    Margin="0,12,0,0" IsVisible="False" />
             <Border x:Name="EndpointBorder" Stroke="Gray" StrokeThickness="1"
-                    StrokeShape="Round8,8,8,8" Padding="12" IsVisible="False">
+                    StrokeShape="RoundRectangle 8" Padding="12" IsVisible="False">
                 <Entry x:Name="EndpointEntry" Placeholder="https://..." ClearButtonVisibility="WhileEditing" />
             </Border>
 
@@ -46,24 +46,24 @@
             <Label Text="模型配置" FontSize="18" FontAttributes="Bold" Margin="0,12,0,0" />
             <VerticalStackLayout Spacing="6" BindingContext="{x:Reference ChatModelEntry}">
                 <Label Text="对话模型（输入名称后自动匹配服务商）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                     <Entry x:Name="ChatModelEntry" Placeholder="gpt-4o-mini / deepseek-chat / glm-4-flash ..."
                            TextChanged="OnChatModelChanged" ClearButtonVisibility="WhileEditing" />
                 </Border>
                 <Label Text="Embedding 模型" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                     <Entry x:Name="EmbeddingModelEntry" Placeholder="text-embedding-3-small" />
                 </Border>
                 <Label Text="Whisper 模型（仅 OpenAI）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                     <Entry x:Name="WhisperModelEntry" Placeholder="whisper-1" />
                 </Border>
                 <Label Text="TTS 模型（仅 OpenAI）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                     <Entry x:Name="TtsModelEntry" Placeholder="tts-1" />
                 </Border>
                 <Label Text="TTS 声音" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round8,8,8,8" Padding="12">
+                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
                     <Picker x:Name="TtsVoicePicker" Title="选择声音">
                         <Picker.ItemsSource>
                             <x:Array Type="{x:Type x:String}">

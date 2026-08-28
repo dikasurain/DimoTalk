@@ -19,7 +19,7 @@
         </CollectionView>
 
         <HorizontalStackLayout Grid.Row="1" Spacing="8" Padding="4,4,4,8">
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="Round24,24,24,24" Padding="16,12" HorizontalOptions="Fill">
+            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 24" Padding="16,12" HorizontalOptions="Fill">
                 <Entry x:Name="InputEntry" Placeholder="输入消息..." ReturnType="Send"
                        Completed="OnSendClicked" ClearButtonVisibility="WhileEditing" />
             </Border>
