@@ -50,122 +50,170 @@ public partial class MemoryPage : ContentPage
         LoadDiaries();
     }
 
-    // ═══ 日记本 ═══
+    // ═══ 日记本（日历视图）═══
+
+    private DateTime _calendarMonth = DateTime.Now;
+    private Dictionary<string, DiaryInfo> _diaryMap = new();
 
     private void LoadDiaries()
     {
         if (_memory == null) return;
-        var diaries = _memory.Autobiography.LoadDiaryList(GetUserId(), limit: 90);
+        var diaries = _memory.Autobiography.LoadDiaryList(GetUserId(), limit: 365);
+        _diaryMap = diaries.ToDictionary(d => d.Date, d => d);
+        RebuildCalendar();
+    }
+
+    /// <summary>重建日历：‹ 年月 › 头 + 七列网格，有日记的日子圆底可点</summary>
+    private void RebuildCalendar()
+    {
         DiaryList.Children.Clear();
 
-        if (diaries.Count == 0)
+        // ── 月份切换头 ──
+        var header = new Grid
         {
-            DiaryList.Children.Add(new Label
+            ColumnDefinitions = new ColumnDefinitionCollection
             {
-                Text = "还没有日记。聊天后离开对话页，我会自动把当天写成日记。",
-                FontSize = 12,
-                TextColor = (Color)Application.Current!.Resources["TextSecondary"],
-            });
-            return;
-        }
-
-        // 按月归档（倒序），第一个月默认展开，其余折叠
-        var monthGroups = diaries.GroupBy(d => d.Date.Length >= 7 ? d.Date[..7] : d.Date).ToList();
-        for (int g = 0; g < monthGroups.Count; g++)
+                new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto),
+            },
+        };
+        var prevBtn = new Button
         {
-            var group = monthGroups[g];
-            var monthBody = new VerticalStackLayout { Spacing = 6, IsVisible = g == 0 };
-
-            foreach (var d in group)
-                monthBody.Children.Add(BuildDiaryRow(d));
-
-            DiaryList.Children.Add(BuildMonthHeader(group.Key, group.Count(), monthBody));
-            DiaryList.Children.Add(monthBody);
-        }
-    }
-
-    /// <summary>月份折叠头：墨点 + 「2026年8月 · N 篇」，点击展开/收起</summary>
-    private Border BuildMonthHeader(string monthKey, int count, VerticalStackLayout monthBody)
-    {
-        string title = monthKey;
-        if (DateTime.TryParseExact(monthKey, "yyyy-MM", null, System.Globalization.DateTimeStyles.None, out var m))
-            title = $"{m.Year}年{m.Month}月";
-
-        var header = new Border
-        {
-            StrokeThickness = 0,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
+            Text = "‹", FontSize = 18, CornerRadius = 6, WidthRequest = 36, HeightRequest = 32, Padding = 0,
             BackgroundColor = (Color)Application.Current!.Resources["InkWash"],
-            Padding = new Thickness(12, 7),
-            Content = new HorizontalStackLayout
-            {
-                Spacing = 8,
-                Children =
-                {
-                    new Border
-                    {
-                        WidthRequest = 8, HeightRequest = 8, StrokeThickness = 0,
-                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(4) },
-                        BackgroundColor = (Color)Application.Current.Resources["Cinnabar"],
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = $"{title} · {count} 篇",
-                        FontSize = 13,
-                        FontAttributes = FontAttributes.Bold,
-                        TextColor = (Color)Application.Current.Resources["InkMedium"],
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                },
-            },
+            TextColor = (Color)Application.Current.Resources["InkMedium"],
         };
-        var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => monthBody.IsVisible = !monthBody.IsVisible;
-        header.GestureRecognizers.Add(tap);
-        return header;
-    }
-
-    /// <summary>单条日记行：日期 + 内容预览，点击进详情卡片</summary>
-    private Border BuildDiaryRow(DiaryInfo d)
-    {
-        var row = new Border
+        prevBtn.Clicked += (_, _) => { _calendarMonth = _calendarMonth.AddMonths(-1); RebuildCalendar(); };
+        var nextBtn = new Button
         {
-            StrokeThickness = 1,
-            Stroke = (Color)Application.Current!.Resources["Divider"],
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
-            BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
-            Padding = new Thickness(12, 8),
-            Content = new HorizontalStackLayout
-            {
-                Spacing = 8,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = FormatDiaryDate(d.Date),
-                        FontSize = 13,
-                        FontAttributes = FontAttributes.Bold,
-                        TextColor = (Color)Application.Current.Resources["InkMedium"],
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                    new Label
-                    {
-                        Text = d.Content.Replace("\n", " "),
-                        FontSize = 12,
-                        TextColor = (Color)Application.Current.Resources["TextSecondary"],
-                        LineBreakMode = LineBreakMode.TailTruncation,
-                        MaximumWidthRequest = 240,
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                },
-            },
+            Text = "›", FontSize = 18, CornerRadius = 6, WidthRequest = 36, HeightRequest = 32, Padding = 0,
+            BackgroundColor = (Color)Application.Current.Resources["InkWash"],
+            TextColor = (Color)Application.Current.Resources["InkMedium"],
         };
-        var captured = d;
-        var tap = new TapGestureRecognizer();
-        tap.Tapped += async (_, _) => await OpenDiaryAsync(captured);
-        row.GestureRecognizers.Add(tap);
-        return row;
+        nextBtn.Clicked += (_, _) => { _calendarMonth = _calendarMonth.AddMonths(1); RebuildCalendar(); };
+        var monthLabel = new Label
+        {
+            Text = $"{_calendarMonth.Year}年{_calendarMonth.Month}月",
+            FontSize = 16, FontAttributes = FontAttributes.Bold,
+            TextColor = (Color)Application.Current.Resources["InkHeavy"],
+            HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+        };
+        header.Add(prevBtn); Grid.SetColumn(prevBtn, 0);
+        header.Add(monthLabel); Grid.SetColumn(monthLabel, 1);
+        header.Add(nextBtn); Grid.SetColumn(nextBtn, 2);
+        DiaryList.Children.Add(header);
+
+        // ── 星期头 ──
+        string[] weekNames = { "一", "二", "三", "四", "五", "六", "日" };
+        var weekRow = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitionCollection(
+                Enumerable.Range(0, 7).Select(_ => new ColumnDefinition(GridLength.Star)).ToArray()),
+            Margin = new Thickness(0, 8, 0, 0),
+        };
+        for (int i = 0; i < 7; i++)
+        {
+            weekRow.Add(new Label
+            {
+                Text = weekNames[i],
+                FontSize = 11,
+                TextColor = (Color)Application.Current.Resources["InkFaint"],
+                HorizontalOptions = LayoutOptions.Center,
+            }, i, 0);
+        }
+        DiaryList.Children.Add(weekRow);
+
+        // ── 日历网格（6 行 × 7 列）──
+        var today = DateTime.Today;
+        var daysInMonth = DateTime.DaysInMonth(_calendarMonth.Year, _calendarMonth.Month);
+        var startCol = ((int)new DateTime(_calendarMonth.Year, _calendarMonth.Month, 1).DayOfWeek + 6) % 7; // 周一=0
+
+        var dayGrid = new Grid
+        {
+            RowDefinitions = new RowDefinitionCollection(
+                Enumerable.Range(0, 6).Select(_ => new RowDefinition(40)).ToArray()),
+            ColumnDefinitions = new ColumnDefinitionCollection(
+                Enumerable.Range(0, 7).Select(_ => new ColumnDefinition(GridLength.Star)).ToArray()),
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+
+        for (int day = 1; day <= daysInMonth; day++)
+        {
+            int pos = startCol + day - 1;
+            int row = pos / 7, col = pos % 7;
+            var date = new DateTime(_calendarMonth.Year, _calendarMonth.Month, day);
+            string dateKey = date.ToString("yyyy-MM-dd");
+
+            View cellContent;
+            if (_diaryMap.TryGetValue(dateKey, out var diary))
+            {
+                // 有日记：朱砂圆底白字，点击进详情
+                var btn = new Border
+                {
+                    WidthRequest = 34, HeightRequest = 34,
+                    StrokeThickness = 0,
+                    StrokeShape = new Microsoft.Maui.Controls.Shapes.Ellipse(),
+                    BackgroundColor = (Color)Application.Current.Resources["Cinnabar"],
+                    HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+                    Content = new Label
+                    {
+                        Text = day.ToString(),
+                        FontSize = 13, FontAttributes = FontAttributes.Bold,
+                        TextColor = Colors.White,
+                        HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+                    },
+                };
+                var captured = diary;
+                var tap = new TapGestureRecognizer();
+                tap.Tapped += async (_, _) => await OpenDiaryAsync(captured);
+                btn.GestureRecognizers.Add(tap);
+                cellContent = btn;
+            }
+            else if (date == today)
+            {
+                // 今天：墨色描边圆
+                cellContent = new Border
+                {
+                    WidthRequest = 34, HeightRequest = 34,
+                    StrokeThickness = 1.5f,
+                    Stroke = (Color)Application.Current.Resources["InkMedium"],
+                    StrokeShape = new Microsoft.Maui.Controls.Shapes.Ellipse(),
+                    BackgroundColor = Colors.Transparent,
+                    HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+                    Content = new Label
+                    {
+                        Text = day.ToString(),
+                        FontSize = 13, FontAttributes = FontAttributes.Bold,
+                        TextColor = (Color)Application.Current.Resources["InkMedium"],
+                        HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+                    },
+                };
+            }
+            else
+            {
+                cellContent = new Label
+                {
+                    Text = day.ToString(),
+                    FontSize = 13,
+                    TextColor = (Color)Application.Current.Resources["InkFaint"],
+                    HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+                };
+            }
+
+            dayGrid.Add(cellContent, col, row);
+        }
+        DiaryList.Children.Add(dayGrid);
+
+        // 提示行
+        DiaryList.Children.Add(new Label
+        {
+            Text = _diaryMap.Count == 0
+                ? "还没有日记。聊天后离开对话页，我会自动把当天写成日记。"
+                : $"朱砂圆标 = 有日记的日子，共 {_diaryMap.Count} 篇。",
+            FontSize = 11,
+            TextColor = (Color)Application.Current.Resources["InkFaint"],
+            HorizontalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, 4, 0, 0),
+        });
     }
 
     private static string FormatDiaryDate(string date)
