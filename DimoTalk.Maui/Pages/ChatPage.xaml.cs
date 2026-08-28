@@ -57,7 +57,7 @@ public partial class ChatPage : ContentPage
         SendButton.IsEnabled = false;
 
         // "正在思考"提示气泡
-        var thinking = new ChatBubble { Content = "正在思考…", IsThinking = true };
+        var thinking = new ChatBubble { Content = "研墨构思中…", IsThinking = true };
         _messages.Add(thinking);
         RefreshList();
 
@@ -101,9 +101,9 @@ public partial class ChatPage : ContentPage
                 Preferences.Set("user_id", userId);
                 await _voiceManager.StartAsync(userId);
                 VoiceButton.Text = "停止";
-                VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["AccentRed"];
-                VoiceButton.TextColor = Colors.White;
-                StatusLabel.Text = "聆听中 · 说出「滴墨」唤醒";
+                VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["Cinnabar"];
+                VoiceButton.TextColor = Color.FromArgb("#F5F2EA");
+                StatusLabel.Text = "侧耳聆听 · 唤之曰「滴墨」";
             }
             catch (Exception ex)
             {
@@ -114,9 +114,9 @@ public partial class ChatPage : ContentPage
         {
             await _voiceManager.StopAsync();
             VoiceButton.Text = "语音";
-            VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["PrimaryLight"];
-            VoiceButton.TextColor = (Color)Application.Current!.Resources["PrimaryDark"];
-            StatusLabel.Text = "在线 · 记忆系统已就绪";
+            VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["InkWash"];
+            VoiceButton.TextColor = (Color)Application.Current!.Resources["InkMedium"];
+            StatusLabel.Text = "墨已研好 · 静候落笔";
         }
     }
 }
@@ -133,15 +133,15 @@ public class ChatBubble
     public Color BubbleColor => IsError
         ? (Color)Application.Current!.Resources["AccentRed"]
         : IsUser
-            ? (Color)Application.Current!.Resources["Primary"]
+            ? (Color)Application.Current!.Resources["InkMedium"]
             : (Color)Application.Current!.Resources["BubbleAI"];
 
     public Color TextColor => IsError
         ? Colors.White
-        : IsUser ? Colors.White : (Color)Application.Current!.Resources["TextPrimary"];
+        : IsUser ? Color.FromArgb("#F5F2EA") : (Color)Application.Current!.Resources["TextPrimary"];
 
     public Color TimeColor => IsUser || IsError
-        ? Color.FromArgb("#B8B8F0")
+        ? Color.FromArgb("#B5AFA0")
         : (Color)Application.Current!.Resources["TextSecondary"];
 
     public LayoutOptions Alignment => IsUser ? LayoutOptions.End : LayoutOptions.Start;

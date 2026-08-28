@@ -8,6 +8,18 @@
     <ScrollView Padding="16,12,16,24">
         <VerticalStackLayout Spacing="8">
 
+            <!-- ===== 卷轴标题 ===== -->
+            <StackLayout HorizontalOptions="Fill" Margin="0,4,0,10">
+                <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
+                    <BoxView WidthRequest="30" HeightRequest="1" BackgroundColor="{StaticResource InkFaint}"
+                             VerticalOptions="Center"/>
+                    <Label Text="文 房 四 宝" FontSize="12" TextColor="{StaticResource InkLight}"
+                           VerticalOptions="Center"/>
+                    <BoxView WidthRequest="30" HeightRequest="1" BackgroundColor="{StaticResource InkFaint}"
+                             VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+            </StackLayout>
+
             <!-- ===== 服务商 ===== -->
             <Label Text="服务商" Style="{StaticResource SectionHeader}" Margin="4,8,0,2"/>
             <Border Style="{StaticResource CardBorder}">

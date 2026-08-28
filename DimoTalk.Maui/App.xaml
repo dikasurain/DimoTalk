@@ -6,55 +6,66 @@
     <Application.Resources>
         <ResourceDictionary>
 
-            <!-- ===== 滴墨讲 主题色板 ===== -->
-            <Color x:Key="PageBackground">#F4F4F9</Color>
-            <Color x:Key="Primary">#5B5BD6</Color>
-            <Color x:Key="PrimaryDark">#4242B8</Color>
-            <Color x:Key="PrimaryLight">#EAEBF9</Color>
-            <Color x:Key="Surface">#FFFFFF</Color>
-            <Color x:Key="TextPrimary">#1D1D2B</Color>
-            <Color x:Key="TextSecondary">#8A8A99</Color>
-            <Color x:Key="BubbleAI">#FFFFFF</Color>
-            <Color x:Key="AccentOrange">#F59E0B</Color>
-            <Color x:Key="AccentRed">#EF4444</Color>
-            <Color x:Key="Divider">#E5E5EF</Color>
-            <Color x:Key="OnlineGreen">#22C55E</Color>
+            <!-- ===== 滴墨 · 水墨主题 ===== -->
+            <!-- 纸：宣纸米白 -->
+            <Color x:Key="PageBackground">#F5F2EA</Color>
+            <!-- 墨：浓墨 → 淡墨 五阶 -->
+            <Color x:Key="InkHeavy">#1C1A17</Color>
+            <Color x:Key="InkMedium">#3D3A34</Color>
+            <Color x:Key="InkLight">#6E6A61</Color>
+            <Color x:Key="InkFaint">#A9A496</Color>
+            <Color x:Key="InkWash">#D8D3C4</Color>
+            <!-- 朱砂：印章红，唯一点缀色 -->
+            <Color x:Key="Cinnabar">#C0392B</Color>
+            <Color x:Key="CinnabarLight">#E8D5D0</Color>
+            <!-- 复用旧键名（代码引用兼容） -->
+            <Color x:Key="Primary">#2B2820</Color>
+            <Color x:Key="Surface">#FDFAF3</Color>
+            <Color x:Key="PrimaryDark">#1C1A17</Color>
+            <Color x:Key="PrimaryLight">#E4E0D3</Color>
+            <Color x:Key="TextPrimary">#26231E</Color>
+            <Color x:Key="TextSecondary">#8A857A</Color>
+            <Color x:Key="BubbleAI">#FDFAF3</Color>
+            <Color x:Key="AccentOrange">#B07D4C</Color>
+            <Color x:Key="AccentRed">#A6362B</Color>
+            <Color x:Key="Divider">#DCD6C6</Color>
+            <Color x:Key="OnlineGreen">#6B8E5A</Color>
 
             <!-- ===== 通用样式 ===== -->
             <Style x:Key="SectionHeader" TargetType="Label">
-                <Setter Property="FontSize" Value="15"/>
+                <Setter Property="FontSize" Value="14"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
-                <Setter Property="Margin" Value="4,0,0,0"/>
+                <Setter Property="TextColor" Value="{StaticResource InkMedium}"/>
+                <Setter Property="Margin" Value="6,0,0,2"/>
             </Style>
 
             <Style x:Key="FieldHint" TargetType="Label">
                 <Setter Property="FontSize" Value="12"/>
                 <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
-                <Setter Property="Margin" Value="6,0,0,4"/>
+                <Setter Property="Margin" Value="8,0,0,4"/>
             </Style>
 
             <Style x:Key="CardBorder" TargetType="Border">
                 <Setter Property="Stroke" Value="{StaticResource Divider}"/>
                 <Setter Property="StrokeThickness" Value="1"/>
-                <Setter Property="StrokeShape" Value="RoundRectangle 14"/>
+                <Setter Property="StrokeShape" Value="RoundRectangle 4"/>
                 <Setter Property="Padding" Value="14,10"/>
                 <Setter Property="BackgroundColor" Value="{StaticResource Surface}"/>
             </Style>
 
             <Style x:Key="PrimaryButton" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
-                <Setter Property="TextColor" Value="White"/>
-                <Setter Property="CornerRadius" Value="22"/>
+                <Setter Property="BackgroundColor" Value="{StaticResource InkMedium}"/>
+                <Setter Property="TextColor" Value="#F5F2EA"/>
+                <Setter Property="CornerRadius" Value="4"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Padding" Value="22,10"/>
             </Style>
 
             <Style x:Key="GhostButton" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
-                <Setter Property="TextColor" Value="{StaticResource PrimaryDark}"/>
-                <Setter Property="CornerRadius" Value="22"/>
+                <Setter Property="BackgroundColor" Value="{StaticResource InkWash}"/>
+                <Setter Property="TextColor" Value="{StaticResource InkMedium}"/>
+                <Setter Property="CornerRadius" Value="4"/>
                 <Setter Property="FontAttributes" Value="Bold"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Padding" Value="22,10"/>
