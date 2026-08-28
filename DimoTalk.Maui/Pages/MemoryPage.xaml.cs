@@ -223,7 +223,7 @@ public partial class MemoryPage : ContentPage
         return date;
     }
 
-    /// <summary>日记详情：日期大标题 + 正文卡片</summary>
+    /// <summary>日记详情：装饰头 + 日期 + 今日对话栏 + 正文卡片 + 页脚</summary>
     private async Task OpenDiaryAsync(DiaryInfo diary)
     {
         // 日期大字：8月28日 · 周四
@@ -235,41 +235,98 @@ public partial class MemoryPage : ContentPage
             week = $" · {dt:dddd}";
         }
 
+        // 今日对话统计栏
+        string chatMeta = "";
+        var stats = _memory?.Autobiography.LoadDayStats(GetUserId(), diary.Date);
+        if (stats != null && stats.Count > 0)
+        {
+            string span = "";
+            if (DateTime.TryParse(stats.FirstTime, out var ft) && DateTime.TryParse(stats.LastTime, out var lt))
+                span = ft.ToString("HH:mm") == lt.ToString("HH:mm") ? $" · {ft:HH:mm}" : $" · {ft:HH:mm} 至 {lt:HH:mm}";
+            chatMeta = $"这一天我们聊了 {stats.Count} 句{span}";
+        }
+
+        var bodyLabel = new Label
+        {
+            Text = diary.Content,
+            FontSize = 15,
+            LineHeight = 1.7d,
+            TextColor = (Color)Application.Current!.Resources["TextPrimary"],
+        };
+        var cardChildren = new List<IView>
+        {
+            // 顶部墨点装饰行
+            new HorizontalStackLayout
+            {
+                Spacing = 5,
+                Children =
+                {
+                    MakeInkDot("Cinnabar"),
+                    MakeInkDot("InkMedium"),
+                    MakeInkDot("Divider"),
+                },
+            },
+            // 日期大标题
+            new Label
+            {
+                Text = $"{bigDate}{week}",
+                FontSize = 22,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = (Color)Application.Current.Resources["InkHeavy"],
+            },
+        };
+
+        // 今日对话栏（有聊天记录才显示）
+        if (chatMeta.Length > 0)
+        {
+            cardChildren.Add(new Border
+            {
+                StrokeThickness = 1,
+                Stroke = (Color)Application.Current.Resources["Divider"],
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
+                BackgroundColor = (Color)Application.Current.Resources["InkWash"],
+                Padding = new Thickness(12, 7),
+                Content = new HorizontalStackLayout
+                {
+                    Spacing = 6,
+                    Children =
+                    {
+                        new Label { Text = "对话", FontSize = 11, FontAttributes = FontAttributes.Bold, TextColor = (Color)Application.Current.Resources["Cinnabar"], VerticalOptions = LayoutOptions.Center },
+                        new Label { Text = chatMeta, FontSize = 12, TextColor = (Color)Application.Current.Resources["TextSecondary"], VerticalOptions = LayoutOptions.Center },
+                    },
+                },
+            });
+        }
+
+        cardChildren.Add(new BoxView { HeightRequest = 1, BackgroundColor = (Color)Application.Current.Resources["Divider"] });
+        cardChildren.Add(bodyLabel);
+
+        // 页脚
+        if (DateTime.TryParse(diary.UpdatedAt, out var ua))
+        {
+            cardChildren.Add(new Label
+            {
+                Text = $"—— 滴墨讲 研墨记于 {ua:HH:mm}",
+                FontSize = 11,
+                TextColor = (Color)Application.Current.Resources["InkFaint"],
+                HorizontalOptions = LayoutOptions.End,
+            });
+        }
+
         var card = new Border
         {
             StrokeThickness = 1,
-            Stroke = (Color)Application.Current!.Resources["Divider"],
+            Stroke = (Color)Application.Current.Resources["Divider"],
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(12) },
             BackgroundColor = (Color)Application.Current.Resources["Surface"],
             Padding = new Thickness(20, 18),
             Margin = new Thickness(16, 12),
-            Content = new VerticalStackLayout
-            {
-                Spacing = 12,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = $"{bigDate}{week}",
-                        FontSize = 20,
-                        FontAttributes = FontAttributes.Bold,
-                        TextColor = (Color)Application.Current.Resources["InkHeavy"],
-                    },
-                    new BoxView
-                    {
-                        HeightRequest = 1,
-                        BackgroundColor = (Color)Application.Current.Resources["Divider"],
-                    },
-                    new Label
-                    {
-                        Text = diary.Content,
-                        FontSize = 15,
-                        LineHeight = 1.7d,
-                        TextColor = (Color)Application.Current.Resources["TextPrimary"],
-                    },
-                },
-            },
+            Content = new VerticalStackLayout { Spacing = 12, Children = { cardChildren[0], cardChildren[1], cardChildren[2] } },
         };
+        // 追加剩余元素
+        var body = (VerticalStackLayout)card.Content!;
+        for (int i = 3; i < cardChildren.Count; i++)
+            body.Children.Add(cardChildren[i]);
 
         await Shell.Current.Navigation.PushAsync(new ContentPage
         {
@@ -277,6 +334,15 @@ public partial class MemoryPage : ContentPage
             BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
             Content = new ScrollView { Content = card },
         });
+    }
+
+    private static BoxView MakeInkDot(string resourceKey)
+    {
+        return new BoxView
+        {
+            WidthRequest = 8, HeightRequest = 8, CornerRadius = 4,
+            Color = (Color)Application.Current!.Resources[resourceKey],
+        };
     }
 
     private async void OnWriteDiaryClicked(object? sender, EventArgs e)

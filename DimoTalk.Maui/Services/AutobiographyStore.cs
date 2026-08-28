@@ -9,8 +9,14 @@ public record ChapterInfo(int Index, string Title, string Content, string Create
 /// <summary>日记条目</summary>
 public record DiaryInfo(string Date, string Content, string UpdatedAt);
 
+/// <summary>聊天记录条目</summary>
+public record ChatMessageRow(string Role, string Content, string Time);
+
+/// <summary>某日对话统计</summary>
+public record DayChatStats(int Count, string? FirstTime, string? LastTime);
+
 /// <summary>
-/// 自传章节 + 主人公画像 + 日记 的 SQLite 存储
+/// 自传章节 + 主人公画像 + 日记 + 聊天记录 的 SQLite 存储
 /// 表挂在 dimotalk_memory.db，由 MemoryManager 初始化连接时一并建表
 /// </summary>
 public class AutobiographyStore
@@ -50,6 +56,15 @@ public class AutobiographyStore
                 updated_at TEXT DEFAULT (datetime('now','localtime')),
                 PRIMARY KEY (user_id, date)
             );
+
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_msg_user_time ON chat_messages(user_id, created_at);
         """;
         cmd.ExecuteNonQuery();
     }
@@ -186,5 +201,57 @@ public class AutobiographyStore
         while (reader.Read())
             list.Add(new DiaryInfo(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
         return list;
+    }
+
+    // ── 聊天记录 ──
+
+    public void SaveMessage(string userId, string role, string content)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO chat_messages (user_id, role, content)
+            VALUES (@uid, @role, @content)
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@role", role);
+        cmd.Parameters.AddWithValue("@content", content);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>最近 limit 条聊天记录（正序返回）</summary>
+    public List<ChatMessageRow> LoadMessages(string userId, int limit = 100)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT role, content, created_at FROM chat_messages
+            WHERE user_id = @uid ORDER BY id DESC LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var list = new List<ChatMessageRow>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add(new ChatMessageRow(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        list.Reverse();
+        return list;
+    }
+
+    /// <summary>某天的对话统计（条数 / 首末时间）</summary>
+    public DayChatStats? LoadDayStats(string userId, string date)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*), MIN(created_at), MAX(created_at) FROM chat_messages
+            WHERE user_id = @uid AND date(created_at) = @date
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@date", date);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read() || reader.GetInt64(0) == 0) return null;
+        var first = reader.IsDBNull(1) ? null : reader.GetString(1);
+        var last = reader.IsDBNull(2) ? null : reader.GetString(2);
+        return new DayChatStats((int)reader.GetInt64(0), first, last);
     }
 }

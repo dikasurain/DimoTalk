@@ -62,10 +62,25 @@ public class ChatService
         var assistantMsg = new Message { Role = MessageRole.Assistant, Content = reply, Timestamp = DateTime.Now };
         _memoryManager.AddToShortTerm(assistantMsg);
 
+        // 聊天记录全量落库（user + assistant）
+        try
+        {
+            _memoryManager.Autobiography.SaveMessage(userId, "user", userInput);
+            _memoryManager.Autobiography.SaveMessage(userId, "assistant", reply);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"聊天记录落库失败: {ex.Message}");
+        }
+
         _ = Task.Run(() => TryExtractToLongTermAsync(userId, userInput));
 
         return reply;
     }
+
+    /// <summary>恢复最近 limit 条聊天记录（正序）</summary>
+    public List<ChatMessageRow> LoadHistory(string userId, int limit = 100)
+        => _memoryManager.Autobiography.LoadMessages(userId, limit);
 
     private async Task TryExtractToLongTermAsync(string userId, string userInput)
     {

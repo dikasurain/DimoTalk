@@ -70,15 +70,50 @@ public partial class ChatPage : ContentPage
         }
     }
 
+    private bool _historyLoaded;
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
         if (_sealBreathHandle == null)
             _sealBreathHandle = InkAnimations.SealBreathing(SealBadge);
 
+        // 首次进入：从数据库恢复历史聊天记录
+        if (!_historyLoaded)
+        {
+            _historyLoaded = true;
+            LoadChatHistory();
+        }
+
         // 切 Tab 回来时滚到底部最新消息
         if (_messages.Count > 0)
             MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: false);
+    }
+
+    /// <summary>从 chat_messages 表恢复最近 60 条聊天记录（app 重启后保留对话）</summary>
+    private void LoadChatHistory()
+    {
+        if (_chatService == null || _messages.Count > 0) return;
+        try
+        {
+            var userId = Preferences.Get("user_id", "");
+            Preferences.Set("user_id", userId);
+            if (string.IsNullOrEmpty(userId)) return;
+
+            var history = _chatService.LoadHistory(userId, 60);
+            foreach (var m in history)
+            {
+                bool isUser = m.Role == "user";
+                DateTime ts = DateTime.TryParse(m.Time, out var t) ? t : DateTime.Now;
+                _messages.Add(new ChatBubble { Content = m.Content, IsUser = isUser, Timestamp = ts });
+            }
+            if (_messages.Count > 0)
+                System.Diagnostics.Debug.WriteLine($"已恢复 {history.Count} 条历史消息");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"恢复聊天记录失败: {ex.Message}");
+        }
     }
 
     private void OnEntryFocused(object? sender, FocusEventArgs e)
