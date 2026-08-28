@@ -2,101 +2,158 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DimoTalk.Maui.Pages.SettingsPage"
-             Title="设置">
+             Title="设置"
+             BackgroundColor="{StaticResource PageBackground}">
 
-    <ScrollView Padding="16">
-        <VerticalStackLayout Spacing="12">
+    <ScrollView Padding="16,12,16,24">
+        <VerticalStackLayout Spacing="8">
 
-            <!-- 服务商 -->
-            <Label Text="服务商" FontSize="18" FontAttributes="Bold" />
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                <Picker x:Name="ProviderPicker"
-                        Title="选择服务商"
-                        ItemDisplayBinding="{Binding Name}"
-                        SelectedIndexChanged="OnProviderChanged" />
+            <!-- ===== 服务商 ===== -->
+            <Label Text="服务商" Style="{StaticResource SectionHeader}" Margin="4,8,0,2"/>
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="8">
+                    <Picker x:Name="ProviderPicker" Title="选择服务商"
+                            ItemDisplayBinding="{Binding Name}"
+                            SelectedIndexChanged="OnProviderChanged"
+                            TextColor="{StaticResource TextPrimary}"/>
+                    <Label x:Name="ProviderDescription" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                           LineBreakMode="WordWrap"/>
+                    <HorizontalStackLayout Spacing="5">
+                        <Label Text="申请 API Key" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                               VerticalTextAlignment="Center"/>
+                        <Label x:Name="WebsiteLink" FontSize="12" TextColor="{StaticResource Primary}"
+                               TextDecorations="Underline">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnWebsiteTapped"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
             </Border>
 
-            <!-- 服务商说明 -->
-            <Label x:Name="ProviderDescription" FontSize="13" TextColor="Gray" />
-            <HorizontalStackLayout Spacing="6">
-                <Label Text="申请 API Key：" FontSize="13" TextColor="Gray" />
-                <Label x:Name="WebsiteLink" FontSize="13" TextColor="Blue" TextDecorations="Underline">
-                    <Label.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnWebsiteTapped" />
-                    </Label.GestureRecognizers>
-                </Label>
-            </HorizontalStackLayout>
-
-            <!-- API Key -->
-            <Label Text="API Key" FontSize="18" FontAttributes="Bold" Margin="0,12,0,0" />
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                <Entry x:Name="ApiKeyEntry" Placeholder="sk-..." IsPassword="True"
-                       ClearButtonVisibility="WhileEditing" />
+            <!-- ===== 密钥 ===== -->
+            <Label Text="API Key" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
+            <Border Style="{StaticResource CardBorder}">
+                <Entry x:Name="ApiKeyEntry" Placeholder="sk-…" IsPassword="True"
+                       PlaceholderColor="{StaticResource TextSecondary}"
+                       TextColor="{StaticResource TextPrimary}"
+                       ClearButtonVisibility="WhileEditing"/>
             </Border>
 
             <!-- 自定义 Endpoint（仅 custom 显示） -->
-            <Label x:Name="EndpointLabel" Text="自定义 Endpoint" FontSize="18" FontAttributes="Bold"
-                   Margin="0,12,0,0" IsVisible="False" />
-            <Border x:Name="EndpointBorder" Stroke="Gray" StrokeThickness="1"
-                    StrokeShape="RoundRectangle 8" Padding="12" IsVisible="False">
-                <Entry x:Name="EndpointEntry" Placeholder="https://..." ClearButtonVisibility="WhileEditing" />
+            <Label x:Name="EndpointLabel" Text="自定义 Endpoint" Style="{StaticResource SectionHeader}"
+                   Margin="4,12,0,2" IsVisible="False"/>
+            <Border x:Name="EndpointBorder" Style="{StaticResource CardBorder}" IsVisible="False">
+                <Entry x:Name="EndpointEntry" Placeholder="https://…"
+                       PlaceholderColor="{StaticResource TextSecondary}"
+                       TextColor="{StaticResource TextPrimary}"
+                       ClearButtonVisibility="WhileEditing"/>
             </Border>
 
-            <!-- 模型配置 -->
-            <Label Text="模型配置" FontSize="18" FontAttributes="Bold" Margin="0,12,0,0" />
-            <VerticalStackLayout Spacing="6" BindingContext="{x:Reference ChatModelEntry}">
-                <Label Text="对话模型（输入名称后自动匹配服务商）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                    <Entry x:Name="ChatModelEntry" Placeholder="gpt-4o-mini / deepseek-chat / glm-4-flash ..."
-                           TextChanged="OnChatModelChanged" ClearButtonVisibility="WhileEditing" />
-                </Border>
-                <Label Text="Embedding 模型" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                    <Entry x:Name="EmbeddingModelEntry" Placeholder="text-embedding-3-small" />
-                </Border>
-                <Label Text="Whisper 模型（仅 OpenAI）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                    <Entry x:Name="WhisperModelEntry" Placeholder="whisper-1" />
-                </Border>
-                <Label Text="TTS 模型（仅 OpenAI）" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                    <Entry x:Name="TtsModelEntry" Placeholder="tts-1" />
-                </Border>
-                <Label Text="TTS 声音" FontSize="13" TextColor="Gray" />
-                <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                    <Picker x:Name="TtsVoicePicker" Title="选择声音">
-                        <Picker.ItemsSource>
-                            <x:Array Type="{x:Type x:String}">
-                                <x:String>alloy</x:String>
-                                <x:String>echo</x:String>
-                                <x:String>fable</x:String>
-                                <x:String>onyx</x:String>
-                                <x:String>nova</x:String>
-                                <x:String>shimmer</x:String>
-                            </x:Array>
-                        </Picker.ItemsSource>
-                    </Picker>
-                </Border>
+            <!-- ===== 模型配置 ===== -->
+            <Label Text="模型配置" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
+            <VerticalStackLayout Spacing="8">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="对话模型（输入名称自动匹配服务商）" Style="{StaticResource FieldHint}"/>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Entry x:Name="ChatModelEntry" Placeholder="gpt-4o-mini / deepseek-chat / glm-4-flash…"
+                               PlaceholderColor="{StaticResource TextSecondary}"
+                               TextColor="{StaticResource TextPrimary}"
+                               TextChanged="OnChatModelChanged" ClearButtonVisibility="WhileEditing"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Embedding 模型" Style="{StaticResource FieldHint}"/>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Entry x:Name="EmbeddingModelEntry" Placeholder="text-embedding-3-small"
+                               PlaceholderColor="{StaticResource TextSecondary}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Whisper 语音识别模型（仅 OpenAI）" Style="{StaticResource FieldHint}"/>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Entry x:Name="WhisperModelEntry" Placeholder="whisper-1"
+                               PlaceholderColor="{StaticResource TextSecondary}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="TTS 语音合成模型（仅 OpenAI）" Style="{StaticResource FieldHint}"/>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Entry x:Name="TtsModelEntry" Placeholder="tts-1"
+                               PlaceholderColor="{StaticResource TextSecondary}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="TTS 音色" Style="{StaticResource FieldHint}"/>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Picker x:Name="TtsVoicePicker" Title="选择声音"
+                                TextColor="{StaticResource TextPrimary}">
+                            <Picker.ItemsSource>
+                                <x:Array Type="{x:Type x:String}">
+                                    <x:String>alloy</x:String>
+                                    <x:String>echo</x:String>
+                                    <x:String>fable</x:String>
+                                    <x:String>onyx</x:String>
+                                    <x:String>nova</x:String>
+                                    <x:String>shimmer</x:String>
+                                </x:Array>
+                            </Picker.ItemsSource>
+                        </Picker>
+                    </Border>
+                </VerticalStackLayout>
             </VerticalStackLayout>
 
-            <!-- 操作按钮 -->
-            <HorizontalStackLayout Spacing="8" Margin="0,12,0,0">
-                <Button Text="保存" Clicked="OnSaveClicked" />
-                <Button Text="重置默认" Clicked="OnResetClicked" />
+            <!-- ===== 操作 ===== -->
+            <HorizontalStackLayout Spacing="10" Margin="0,16,0,0">
+                <Button Text="保存配置" Clicked="OnSaveClicked" Style="{StaticResource PrimaryButton}"
+                        HorizontalOptions="Fill" FontSize="15"/>
+                <Button Text="重置" Clicked="OnResetClicked" Style="{StaticResource GhostButton}"/>
             </HorizontalStackLayout>
 
-            <Line HeightRequest="1" Background="LightGray" Margin="0,16" />
-
-            <!-- 关于记忆系统 -->
-            <Label Text="关于记忆系统" FontSize="18" FontAttributes="Bold" />
-            <Label FontSize="14" LineBreakMode="WordWrap" TextColor="Gray">
-                <Label.Text>
-                    本应用使用三层记忆架构：
-                    &#x0a;• 短期：当前对话上下文窗口（最近 20 条）
-                    &#x0a;• 中期：会话结束后自动生成摘要存入 SQLite
-                    &#x0a;• 长期：从对话中提取的用户偏好/事实，向量检索
-                </Label.Text>
-            </Label>
+            <!-- ===== 记忆系统说明 ===== -->
+            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}" Margin="0,20,0,8"/>
+            <Label Text="关于记忆系统" Style="{StaticResource SectionHeader}"/>
+            <Border Style="{StaticResource CardBorder}" Margin="0,4,0,0">
+                <VerticalStackLayout Spacing="8">
+                    <HorizontalStackLayout Spacing="10">
+                        <Border WidthRequest="8" HeightRequest="8" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 4" BackgroundColor="{StaticResource Primary}"
+                                VerticalOptions="Center"/>
+                        <Label Text="短期记忆" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Label Text="当前对话最近 20 条上下文" FontSize="12"
+                               TextColor="{StaticResource TextSecondary}" VerticalTextAlignment="Center"
+                               HorizontalOptions="EndAndExpand" LineBreakMode="WordWrap"/>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="10">
+                        <Border WidthRequest="8" HeightRequest="8" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 4" BackgroundColor="{StaticResource AccentOrange}"
+                                VerticalOptions="Center"/>
+                        <Label Text="中期记忆" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Label Text="会话结束自动生成摘要存入 SQLite" FontSize="12"
+                               TextColor="{StaticResource TextSecondary}" VerticalTextAlignment="Center"
+                               HorizontalOptions="EndAndExpand" LineBreakMode="TailTruncation"/>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="10">
+                        <Border WidthRequest="8" HeightRequest="8" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 4" BackgroundColor="{StaticResource OnlineGreen}"
+                                VerticalOptions="Center"/>
+                        <Label Text="长期记忆" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Label Text="用户偏好与事实 · 向量检索" FontSize="12"
+                               TextColor="{StaticResource TextSecondary}" VerticalTextAlignment="Center"
+                               HorizontalOptions="EndAndExpand" LineBreakMode="TailTruncation"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

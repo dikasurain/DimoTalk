@@ -3,28 +3,105 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DimoTalk.Maui.Pages.ChatPage"
              Title="滴墨讲"
+             NavigationPage.HasNavigationBar="False"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <Grid RowDefinitions="*,Auto" Padding="8">
-        <CollectionView x:Name="MessagesView" Grid.Row="0" Margin="4">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- ===== 顶部头像栏 ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Padding="16,10,16,8"
+              BackgroundColor="Transparent">
+            <!-- 头像 -->
+            <Border Grid.Column="0" WidthRequest="40" HeightRequest="40"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 20"
+                    BackgroundColor="{StaticResource Primary}">
+                <Label Text="墨" TextColor="White" FontSize="18" FontAttributes="Bold"
+                       HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
+            </Border>
+            <!-- 名称 + 状态 -->
+            <VerticalStackLayout Grid.Column="1" Margin="10,0,0,0" VerticalOptions="Center">
+                <Label Text="滴墨讲" FontSize="16" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}"/>
+                <HorizontalStackLayout Spacing="5">
+                    <Ellipse WidthRequest="6" HeightRequest="6" Fill="{StaticResource OnlineGreen}"/>
+                    <Label x:Name="StatusLabel" Text="在线 · 记忆系统已就绪" FontSize="11"
+                           TextColor="{StaticResource TextSecondary}"/>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+            <BoxView Grid.Column="4" HeightRequest="1" BackgroundColor="{StaticResource Divider}"
+                     VerticalOptions="End"/>
+        </Grid>
+
+        <!-- ===== 消息列表 ===== -->
+        <CollectionView x:Name="MessagesView" Grid.Row="1" Margin="8,4,8,0">
+            <CollectionView.EmptyView>
+                <StackLayout Padding="32" VerticalOptions="Center" HorizontalOptions="Center">
+                    <Border WidthRequest="64" HeightRequest="64" HorizontalOptions="Center"
+                            StrokeThickness="0" StrokeShape="RoundRectangle 32"
+                            BackgroundColor="{StaticResource PrimaryLight}">
+                        <Label Text="墨" TextColor="{StaticResource Primary}" FontSize="28" FontAttributes="Bold"
+                               HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
+                    </Border>
+                    <Label Text="开始与滴墨讲对话" FontSize="18" FontAttributes="Bold"
+                           TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"
+                           Margin="0,16,0,4"/>
+                    <Label Text="语音模式下说出「滴墨」即可唤醒&#x0a;支持长期记忆 · 自动总结会话"
+                           FontSize="13" TextColor="{StaticResource TextSecondary}"
+                           HorizontalTextAlignment="Center" LineBreakMode="WordWrap"/>
+                </StackLayout>
+            </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Frame Padding="14,10" Margin="4" CornerRadius="16" HasShadow="False"
+                    <Frame Padding="14,10" HasShadow="False"
                            BackgroundColor="{Binding BubbleColor}"
-                           HorizontalOptions="{Binding Alignment}">
-                        <Label Text="{Binding Content}" TextColor="{Binding TextColor}" FontSize="15" />
+                           HorizontalOptions="{Binding Alignment}"
+                           CornerRadius="16,16,16,4"
+                           Margin="10,3,64,3">
+                        <Frame.Triggers>
+                            <DataTrigger TargetType="Frame" Binding="{Binding IsUser}" Value="True">
+                                <Setter Property="CornerRadius" Value="16,16,4,16"/>
+                                <Setter Property="Margin" Value="64,3,10,3"/>
+                            </DataTrigger>
+                            <DataTrigger TargetType="Frame" Binding="{Binding IsThinking}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                <Setter Property="Margin" Value="10,3,120,3"/>
+                            </DataTrigger>
+                        </Frame.Triggers>
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="{Binding Content}" TextColor="{Binding TextColor}"
+                                   FontSize="15" LineBreakMode="WordWrap">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsThinking}" Value="True">
+                                        <Setter Property="FontAttributes" Value="Italic"/>
+                                        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                            <Label Text="{Binding Time}" FontSize="10"
+                                   TextColor="{Binding TimeColor}" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <HorizontalStackLayout Grid.Row="1" Spacing="8" Padding="4,4,4,8">
-            <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 24" Padding="16,12" HorizontalOptions="Fill">
-                <Entry x:Name="InputEntry" Placeholder="输入消息..." ReturnType="Send"
-                       Completed="OnSendClicked" ClearButtonVisibility="WhileEditing" />
-            </Border>
-            <Button x:Name="VoiceButton" Text="语音" Clicked="OnVoiceClicked" BackgroundColor="#FF9800" />
-            <Button x:Name="SendButton" Text="发送" Clicked="OnSendClicked" />
-        </HorizontalStackLayout>
+        <!-- ===== 输入栏 ===== -->
+        <Border Grid.Row="2" Margin="10,8,10,12" Padding="6,5"
+                Stroke="{StaticResource Divider}" StrokeThickness="1"
+                StrokeShape="RoundRectangle 26" BackgroundColor="{StaticResource Surface}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                <Button x:Name="VoiceButton" Grid.Column="0" Text="语音" Clicked="OnVoiceClicked"
+                        Style="{StaticResource GhostButton}" CornerRadius="18" Padding="16,8"
+                        BackgroundColor="{StaticResource PrimaryLight}"
+                        TextColor="{StaticResource PrimaryDark}"/>
+                <Entry x:Name="InputEntry" Grid.Column="1" Placeholder="输入消息…"
+                       PlaceholderColor="{StaticResource TextSecondary}"
+                       TextColor="{StaticResource TextPrimary}" FontSize="15"
+                       ReturnType="Send" Completed="OnSendClicked"
+                       ClearButtonVisibility="WhileEditing" BackgroundColor="Transparent"/>
+                <Button x:Name="SendButton" Grid.Column="2" Text="发送" Clicked="OnSendClicked"
+                        Style="{StaticResource PrimaryButton}" CornerRadius="18" Padding="18,8"/>
+            </Grid>
+        </Border>
     </Grid>
 </ContentPage>
