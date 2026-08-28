@@ -55,7 +55,7 @@ public partial class MemoryPage : ContentPage
     private void LoadDiaries()
     {
         if (_memory == null) return;
-        var diaries = _memory.Autobiography.LoadDiaryList(GetUserId());
+        var diaries = _memory.Autobiography.LoadDiaryList(GetUserId(), limit: 90);
         DiaryList.Children.Clear();
 
         if (diaries.Count == 0)
@@ -69,46 +69,103 @@ public partial class MemoryPage : ContentPage
             return;
         }
 
-        foreach (var d in diaries)
+        // 按月归档（倒序），第一个月默认展开，其余折叠
+        var monthGroups = diaries.GroupBy(d => d.Date.Length >= 7 ? d.Date[..7] : d.Date).ToList();
+        for (int g = 0; g < monthGroups.Count; g++)
         {
-            var row = new Border
+            var group = monthGroups[g];
+            var monthBody = new VerticalStackLayout { Spacing = 6, IsVisible = g == 0 };
+
+            foreach (var d in group)
+                monthBody.Children.Add(BuildDiaryRow(d));
+
+            DiaryList.Children.Add(BuildMonthHeader(group.Key, group.Count(), monthBody));
+            DiaryList.Children.Add(monthBody);
+        }
+    }
+
+    /// <summary>月份折叠头：墨点 + 「2026年8月 · N 篇」，点击展开/收起</summary>
+    private Border BuildMonthHeader(string monthKey, int count, VerticalStackLayout monthBody)
+    {
+        string title = monthKey;
+        if (DateTime.TryParseExact(monthKey, "yyyy-MM", null, System.Globalization.DateTimeStyles.None, out var m))
+            title = $"{m.Year}年{m.Month}月";
+
+        var header = new Border
+        {
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
+            BackgroundColor = (Color)Application.Current!.Resources["InkWash"],
+            Padding = new Thickness(12, 7),
+            Content = new HorizontalStackLayout
             {
-                StrokeThickness = 1,
-                Stroke = (Color)Application.Current!.Resources["Divider"],
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
-                BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
-                Padding = new Thickness(12, 8),
-                Content = new HorizontalStackLayout
+                Spacing = 8,
+                Children =
                 {
-                    Spacing = 8,
-                    Children =
+                    new Border
                     {
-                        new Label
-                        {
-                            Text = FormatDiaryDate(d.Date),
-                            FontSize = 13,
-                            FontAttributes = FontAttributes.Bold,
-                            TextColor = (Color)Application.Current.Resources["InkMedium"],
-                            VerticalOptions = LayoutOptions.Center,
-                        },
-                        new Label
-                        {
-                            Text = d.Content.Replace("\n", " "),
-                            FontSize = 12,
-                            TextColor = (Color)Application.Current.Resources["TextSecondary"],
-                            LineBreakMode = LineBreakMode.TailTruncation,
-                            MaximumWidthRequest = 240,
-                            VerticalOptions = LayoutOptions.Center,
-                        },
+                        WidthRequest = 8, HeightRequest = 8, StrokeThickness = 0,
+                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(4) },
+                        BackgroundColor = (Color)Application.Current.Resources["Cinnabar"],
+                        VerticalOptions = LayoutOptions.Center,
+                    },
+                    new Label
+                    {
+                        Text = $"{title} · {count} 篇",
+                        FontSize = 13,
+                        FontAttributes = FontAttributes.Bold,
+                        TextColor = (Color)Application.Current.Resources["InkMedium"],
+                        VerticalOptions = LayoutOptions.Center,
                     },
                 },
-            };
-            var captured = d;
-            var tap = new TapGestureRecognizer();
-            tap.Tapped += async (_, _) => await OpenDiaryAsync(captured);
-            row.GestureRecognizers.Add(tap);
-            DiaryList.Children.Add(row);
-        }
+            },
+        };
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += (_, _) => monthBody.IsVisible = !monthBody.IsVisible;
+        header.GestureRecognizers.Add(tap);
+        return header;
+    }
+
+    /// <summary>单条日记行：日期 + 内容预览，点击进详情卡片</summary>
+    private Border BuildDiaryRow(DiaryInfo d)
+    {
+        var row = new Border
+        {
+            StrokeThickness = 1,
+            Stroke = (Color)Application.Current!.Resources["Divider"],
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
+            BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
+            Padding = new Thickness(12, 8),
+            Content = new HorizontalStackLayout
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = FormatDiaryDate(d.Date),
+                        FontSize = 13,
+                        FontAttributes = FontAttributes.Bold,
+                        TextColor = (Color)Application.Current.Resources["InkMedium"],
+                        VerticalOptions = LayoutOptions.Center,
+                    },
+                    new Label
+                    {
+                        Text = d.Content.Replace("\n", " "),
+                        FontSize = 12,
+                        TextColor = (Color)Application.Current.Resources["TextSecondary"],
+                        LineBreakMode = LineBreakMode.TailTruncation,
+                        MaximumWidthRequest = 240,
+                        VerticalOptions = LayoutOptions.Center,
+                    },
+                },
+            },
+        };
+        var captured = d;
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (_, _) => await OpenDiaryAsync(captured);
+        row.GestureRecognizers.Add(tap);
+        return row;
     }
 
     private static string FormatDiaryDate(string date)
@@ -118,24 +175,59 @@ public partial class MemoryPage : ContentPage
         return date;
     }
 
+    /// <summary>日记详情：日期大标题 + 正文卡片</summary>
     private async Task OpenDiaryAsync(DiaryInfo diary)
     {
-        var contentLabel = new Label
+        // 日期大字：8月28日 · 周四
+        string bigDate = diary.Date;
+        string week = "";
+        if (DateTime.TryParse(diary.Date, out var dt))
         {
-            Text = diary.Content,
-            FontSize = 15,
-            LineHeight = 1.6d,
-            TextColor = (Color)Application.Current!.Resources["TextPrimary"],
+            bigDate = $"{dt.Month}月{dt.Day}日";
+            week = $" · {dt:dddd}";
+        }
+
+        var card = new Border
+        {
+            StrokeThickness = 1,
+            Stroke = (Color)Application.Current!.Resources["Divider"],
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(12) },
+            BackgroundColor = (Color)Application.Current.Resources["Surface"],
+            Padding = new Thickness(20, 18),
+            Margin = new Thickness(16, 12),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 12,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = $"{bigDate}{week}",
+                        FontSize = 20,
+                        FontAttributes = FontAttributes.Bold,
+                        TextColor = (Color)Application.Current.Resources["InkHeavy"],
+                    },
+                    new BoxView
+                    {
+                        HeightRequest = 1,
+                        BackgroundColor = (Color)Application.Current.Resources["Divider"],
+                    },
+                    new Label
+                    {
+                        Text = diary.Content,
+                        FontSize = 15,
+                        LineHeight = 1.7d,
+                        TextColor = (Color)Application.Current.Resources["TextPrimary"],
+                    },
+                },
+            },
         };
+
         await Shell.Current.Navigation.PushAsync(new ContentPage
         {
-            Title = FormatDiaryDate(diary.Date),
+            Title = "日记",
             BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
-            Content = new ScrollView
-            {
-                Content = new StackLayout { Children = { contentLabel } },
-                Padding = new Thickness(18, 14),
-            },
+            Content = new ScrollView { Content = card },
         });
     }
 
