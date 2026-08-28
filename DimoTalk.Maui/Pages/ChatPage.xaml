@@ -45,11 +45,14 @@
         <CollectionView x:Name="MessagesView" Grid.Row="1" Margin="10,4,10,0">
             <CollectionView.EmptyView>
                 <StackLayout Padding="32" VerticalOptions="Center" HorizontalOptions="Center">
-                    <!-- 印章式大图标 -->
+                    <!-- 印章式大图标：钤盖进场 + 墨晕呼吸 -->
                     <Border WidthRequest="72" HeightRequest="72" HorizontalOptions="Center"
                             StrokeThickness="2" StrokeShape="RoundRectangle 8"
                             Stroke="{StaticResource Cinnabar}" BackgroundColor="Transparent"
                             Margin="0,0,0,0">
+                        <Border.Behaviors>
+                            <behaviors:SealInkBloomBehavior/>
+                        </Border.Behaviors>
                         <Label Text="墨" TextColor="{StaticResource Cinnabar}" FontSize="34"
                                FontAttributes="Bold"
                                HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
@@ -69,6 +72,9 @@
                            HorizontalOptions="{Binding Alignment}"
                            CornerRadius="4,4,4,12"
                            Margin="6,3,60,3">
+                        <Frame.Behaviors>
+                            <behaviors:BubbleEnterBehavior/>
+                        </Frame.Behaviors>
                         <Frame.Triggers>
                             <DataTrigger TargetType="Frame" Binding="{Binding IsUser}" Value="True">
                                 <Setter Property="CornerRadius" Value="4,12,4,4"/>
