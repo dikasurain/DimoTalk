@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:behaviors="clr-namespace:DimoTalk.Maui.Behaviors"
              x:Class="DimoTalk.Maui.Pages.ChatPage"
              Title="滴墨讲"
              NavigationPage.HasNavigationBar="False"
@@ -11,7 +12,7 @@
         <!-- ===== 顶栏：印章 + 品名 ===== -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto" Padding="18,12,18,10">
             <!-- 朱砂印章头像 -->
-            <Border Grid.Column="0" WidthRequest="42" HeightRequest="42"
+            <Border x:Name="SealBadge" Grid.Column="0" WidthRequest="42" HeightRequest="42"
                     StrokeThickness="0" StrokeShape="RoundRectangle 6"
                     BackgroundColor="{StaticResource Cinnabar}"
                     Padding="2">
@@ -79,8 +80,32 @@
                             </DataTrigger>
                         </Frame.Triggers>
                         <VerticalStackLayout Spacing="3">
+                            <!-- 思考态：三个墨点循环（IsThinking 时显示） -->
+                            <HorizontalStackLayout Spacing="6" Margin="0,4,0,2" IsVisible="False">
+                                <HorizontalStackLayout.Behaviors>
+                                    <behaviors:GrindingDotsBehavior/>
+                                </HorizontalStackLayout.Behaviors>
+                                <HorizontalStackLayout.Triggers>
+                                    <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding IsThinking}" Value="True">
+                                        <Setter Property="IsVisible" Value="True"/>
+                                    </DataTrigger>
+                                </HorizontalStackLayout.Triggers>
+                                <Border WidthRequest="7" HeightRequest="7" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 3" BackgroundColor="{StaticResource InkLight}"
+                                        Opacity="0.15"/>
+                                <Border WidthRequest="7" HeightRequest="7" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 3" BackgroundColor="{StaticResource InkLight}"
+                                        Opacity="0.15"/>
+                                <Border WidthRequest="7" HeightRequest="7" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 3" BackgroundColor="{StaticResource InkLight}"
+                                        Opacity="0.15"/>
+                                <Label Text="研墨构思中" FontSize="13" FontAttributes="Italic"
+                                       TextColor="{StaticResource TextSecondary}" Margin="4,0,0,0"
+                                       VerticalTextAlignment="Center"/>
+                            </HorizontalStackLayout>
                             <Label Text="{Binding Content}" TextColor="{Binding TextColor}"
-                                   FontSize="15" LineBreakMode="WordWrap">
+                                   FontSize="15" LineBreakMode="WordWrap"
+                                   IsVisible="{Binding ShowContent}">
                                 <Label.Triggers>
                                     <DataTrigger TargetType="Label" Binding="{Binding IsThinking}" Value="True">
                                         <Setter Property="FontAttributes" Value="Italic"/>
@@ -89,7 +114,8 @@
                                 </Label.Triggers>
                             </Label>
                             <Label Text="{Binding Time}" FontSize="10"
-                                   TextColor="{Binding TimeColor}" HorizontalOptions="End"/>
+                                   TextColor="{Binding TimeColor}" HorizontalOptions="End"
+                                   IsVisible="{Binding ShowContent}"/>
                         </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>

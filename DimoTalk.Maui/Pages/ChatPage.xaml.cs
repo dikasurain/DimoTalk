@@ -11,6 +11,10 @@ public partial class ChatPage : ContentPage
     private readonly Func<string> _getApiKey;
     private readonly List<ChatBubble> _messages = new();
 
+    // 动画句柄
+    private CancellationTokenStartInfo? _sealBreathHandle;
+    private CancellationTokenStartInfo? _grindingHandle;
+
     public ChatPage(ChatService? chatService, VoiceConversationManager? voiceManager, Func<string> getApiKey)
     {
         InitializeComponent();
@@ -19,13 +23,32 @@ public partial class ChatPage : ContentPage
         _getApiKey = getApiKey;
         MessagesView.ItemsSource = _messages;
 
+        // 顶栏印章常驻呼吸动效
+        _sealBreathHandle = InkAnimations.SealBreathing(SealBadge);
+
         // 记忆系统就绪状态提示（MauiProgram.InitializeMemoryAsync 是异步的，延迟检查）
         _ = Task.Delay(2500).ContinueWith(_ =>
         {
             if (MauiProgram.MemoryInstance == null)
                 MainThread.BeginInvokeOnMainThread(() =>
-                    StatusLabel.Text = "初始化中 · 记忆系统加载…");
+                    StatusLabel.Text = "研墨中 · 记忆系统加载…");
         }, TaskScheduler.Default);
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        // 页面离开时停止动画，避免后台空转
+        InkAnimations.Stop(_grindingHandle);
+        InkAnimations.Stop(_sealBreathHandle);
+        _sealBreathHandle = null;
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_sealBreathHandle == null)
+            _sealBreathHandle = InkAnimations.SealBreathing(SealBadge);
     }
 
     private void RefreshList(bool scrollToEnd = true)
@@ -56,7 +79,11 @@ public partial class ChatPage : ContentPage
         InputEntry.Text = string.Empty;
         SendButton.IsEnabled = false;
 
-        // "正在思考"提示气泡
+        // 落墨动效：按钮印章钤盖 + 墨滴涟漪
+        _ = InkAnimations.SealStampAsync(SendButton);
+        _ = InkAnimations.InkRippleAsync(SendButton);
+
+        // "研墨构思中"提示气泡（淡墨底 + 斜体，DataTrigger 已在 XAML 中处理样式）
         var thinking = new ChatBubble { Content = "研墨构思中…", IsThinking = true };
         _messages.Add(thinking);
         RefreshList();
@@ -127,6 +154,8 @@ public class ChatBubble
     public bool IsUser { get; set; }
     public bool IsThinking { get; set; }
     public bool IsError { get; set; }
+    /// <summary>思考态只显示墨点动画，隐藏正文与时间</summary>
+    public bool ShowContent => !IsThinking;
     public DateTime Timestamp { get; init; } = DateTime.Now;
     public string Time => Timestamp.ToString("HH:mm");
 
