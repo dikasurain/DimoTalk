@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DimoTalk.Maui.Pages.MemoryPage"
+             Title="记忆馆"
+             BackgroundColor="{StaticResource PageBackground}">
+
+    <ScrollView x:Name="RootScrollView" Padding="0,8,0,0">
+        <VerticalStackLayout Padding="16,8,16,24" Spacing="14">
+
+            <!-- ═══ 主人公档案 ═══ -->
+            <Border StrokeThickness="1" Stroke="{StaticResource Divider}"
+                    StrokeShape="RoundRectangle 10"
+                    BackgroundColor="{StaticResource Surface}" Padding="16,14">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="主人公档案" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource InkHeavy}"/>
+                        <Label Text="· 从记忆中自动判定" FontSize="11"
+                               TextColor="{StaticResource InkFaint}" VerticalOptions="End"/>
+                    </HorizontalStackLayout>
+
+                    <Label x:Name="ProfileSummaryLabel" FontSize="14"
+                           TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"
+                           Text="尚未判定——先和我聊聊天，攒些记忆。"/>
+
+                    <FlexLayout x:Name="SkillsWrap" Wrap="Wrap" JustifyContent="Start"/>
+
+                    <Label x:Name="ProfileUpdatedLabel" FontSize="10"
+                           TextColor="{StaticResource InkFaint}" IsVisible="False"/>
+
+                    <Button x:Name="AnalyzeProfileButton" Text="重新判定画像" Clicked="OnAnalyzeProfileClicked"
+                            CornerRadius="6" Padding="0,6" FontSize="13"
+                            BackgroundColor="{StaticResource InkWash}" TextColor="{StaticResource InkMedium}"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ═══ 自传 ═══ -->
+            <Border StrokeThickness="1" Stroke="{StaticResource Divider}"
+                    StrokeShape="RoundRectangle 10"
+                    BackgroundColor="{StaticResource Surface}" Padding="16,14">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="人物自传" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource InkHeavy}"/>
+                        <Label Text="· 按章成书 · 可导出 docx" FontSize="11"
+                               TextColor="{StaticResource InkFaint}" VerticalOptions="End"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 章节列表（动态填充） -->
+                    <VerticalStackLayout x:Name="ChaptersList" Spacing="6"/>
+
+                    <Label x:Name="AutoStatusLabel" FontSize="12"
+                           TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"
+                           Text=""/>
+                    <ProgressBar x:Name="GenProgressBar" Progress="0" IsVisible="False"
+                                 ProgressColor="{StaticResource Cinnabar}"/>
+
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="Fill">
+                        <Button x:Name="GenerateButton" Text="生成自传" Clicked="OnGenerateClicked"
+                                CornerRadius="6" Padding="0,6" FontSize="13" HorizontalOptions="FillAndExpand"
+                                BackgroundColor="{StaticResource Cinnabar}" TextColor="White"/>
+                        <Button x:Name="ExportButton" Text="导出 docx" Clicked="OnExportClicked"
+                                CornerRadius="6" Padding="0,6" FontSize="13" HorizontalOptions="FillAndExpand"
+                                IsEnabled="False"
+                                BackgroundColor="{StaticResource InkWash}" TextColor="{StaticResource InkMedium}"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ═══ 本体 Soul ═══ -->
+            <Border StrokeThickness="1" Stroke="{StaticResource Divider}"
+                    StrokeShape="RoundRectangle 10"
+                    BackgroundColor="{StaticResource Surface}" Padding="16,14">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="本体 · Soul" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource InkHeavy}"/>
+                        <Label Text="· 我是谁由你定义" FontSize="11"
+                               TextColor="{StaticResource InkFaint}" VerticalOptions="End"/>
+                    </HorizontalStackLayout>
+
+                    <Picker x:Name="SoulPicker" Title="选择灵魂模板"
+                            FontSize="13" TextColor="{StaticResource InkMedium}"/>
+
+                    <Label x:Name="SoulDescLabel" FontSize="12"
+                           TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+
+                    <Label Text="本体人格（Persona）" FontSize="12" TextColor="{StaticResource InkLight}"/>
+                    <Editor x:Name="SoulPersonaEditor" HeightRequest="96" FontSize="13"
+                            TextColor="{StaticResource TextPrimary}"
+                            BackgroundColor="{StaticResource PageBackground}" IsTextPredictionEnabled="False"/>
+
+                    <Label Text="说话口吻（Tone）" FontSize="12" TextColor="{StaticResource InkLight}"/>
+                    <Entry x:Name="SoulToneEntry" FontSize="13"
+                           TextColor="{StaticResource TextPrimary}"
+                           BackgroundColor="{StaticResource PageBackground}" IsTextPredictionEnabled="False"/>
+
+                    <Button x:Name="SaveSoulButton" Text="注入此灵魂" Clicked="OnSaveSoulClicked"
+                            CornerRadius="6" Padding="0,6" FontSize="13"
+                            BackgroundColor="{StaticResource InkHeavy}" TextColor="#F5F2EA"/>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

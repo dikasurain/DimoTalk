@@ -80,6 +80,12 @@ public static class MauiProgram
             var voice = sp.GetService<VoiceConversationManager>();
             return new ChatPage(chatService, voice, () => Preferences.Get("openai_api_key", string.Empty));
         });
+        builder.Services.AddSingleton<MemoryPage>(sp =>
+        {
+            var ai = sp.GetRequiredService<OpenAIClient>();
+            var auto = sp.GetService<AutobiographyService>();
+            return new MemoryPage(MemoryInstance, auto, ai, () => Preferences.Get("openai_api_key", string.Empty));
+        });
         builder.Services.AddTransient<SettingsPage>();
 
         var app = builder.Build();

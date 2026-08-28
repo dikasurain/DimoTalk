@@ -165,25 +165,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- ===== 自传 ===== -->
-            <Label Text="记忆归档" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
-            <Border Style="{StaticResource CardBorder}">
-                <VerticalStackLayout Spacing="10">
-                    <HorizontalStackLayout Spacing="10">
-                        <Border WidthRequest="8" HeightRequest="8" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 4"
-                                BackgroundColor="{StaticResource Cinnabar}"
-                                VerticalOptions="Center"/>
-                        <Label Text="生成我的自传" FontSize="13" FontAttributes="Bold"
-                               TextColor="{StaticResource TextPrimary}"
-                               VerticalTextAlignment="Center"/>
-                    </HorizontalStackLayout>
-                    <Label Text="AI 会从记忆匣中提炼你的故事，写成一篇人物自述"
-                           FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                    <Button Text="📜 生成自传" Clicked="OnGenerateAutoBiographyClicked"
-                            Style="{StaticResource GhostButton}" FontSize="13" Padding="12,6"/>
-                </VerticalStackLayout>
-            </Border>
+            <!-- 自传功能已迁至「记忆馆」Tab -->
 
             <!-- ===== 操作 ===== -->
             <HorizontalStackLayout Spacing="10" Margin="0,16,0,0">

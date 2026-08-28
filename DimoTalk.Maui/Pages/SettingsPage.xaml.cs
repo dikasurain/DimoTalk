@@ -152,56 +152,6 @@ public partial class SettingsPage : ContentPage
         DisplayAlert("提示", "配置已保存", "确定");
     }
 
-    private async void OnGenerateAutoBiographyClicked(object? sender, EventArgs e)
-    {
-        var apiKey = Preferences.Get("openai_api_key", string.Empty);
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            await DisplayAlert("提示", "请先在上方配置 API Key", "确定");
-            return;
-        }
-
-        var userId = Preferences.Get("user_id", Guid.NewGuid().ToString());
-        Preferences.Set("user_id", userId);
-
-        try
-        {
-            var ai = Handler?.MauiContext?.Services.GetService<DimoTalk.Maui.Services.AutobiographyService>();
-            if (ai == null)
-            {
-                await DisplayAlert("提示", "服务未就绪，请重启应用", "确定");
-                return;
-            }
-
-            // 显示 Loading 弹窗
-            var loadingPage = new ContentPage
-            {
-                Content = new VerticalStackLayout
-                {
-                    Padding = 30,
-                    Spacing = 16,
-                    Children =
-                    {
-                        new Label { Text = "研墨润笔中…", FontSize = 16, HorizontalOptions = LayoutOptions.Center },
-                        new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Center },
-                    }
-                }
-            };
-            await Navigation.PushModalAsync(loadingPage);
-
-            var text = await ai.GenerateAsync(userId);
-
-            await Navigation.PopModalAsync();
-
-            // 显示结果
-            await DisplayAlert("📜 我的自述", text, "好的");
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("生成失败", ex.Message, "确定");
-        }
-    }
-
     private void OnResetClicked(object? sender, EventArgs e)
     {
         _config = new UserAiConfig();

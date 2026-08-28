@@ -9,6 +9,9 @@
         <Tab Title="对话" Icon="chat.png">
             <ShellContent ContentTemplate="{DataTemplate pages:ChatPage}" />
         </Tab>
+        <Tab Title="记忆馆" Icon="chat.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:MemoryPage}" />
+        </Tab>
         <Tab Title="设置" Icon="settings.png">
             <ShellContent ContentTemplate="{DataTemplate pages:SettingsPage}" />
         </Tab>

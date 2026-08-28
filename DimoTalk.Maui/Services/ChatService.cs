@@ -53,6 +53,7 @@ public class ChatService
 
         var messages = PromptBuilder.ToOpenAIMessages(
             userInput, _memoryManager.ShortTerm, midSummaries, ltmHits,
+            systemPrompt: SoulRegistry.Current().ToPrompt(),
             dialectConstraint: dialectConstraint);
         var reply = await _ai.ChatAsync(messages);
 

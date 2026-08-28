@@ -9,13 +9,15 @@ public class MemoryManager : IDisposable
     public ShortTermMemory ShortTerm { get; }
     public MidTermMemory MidTerm { get; }
     public LongTermMemory LongTerm { get; }
+    public AutobiographyStore Autobiography { get; }
     private readonly SqliteConnection _conn;
 
-    private MemoryManager(ShortTermMemory shortTerm, MidTermMemory midTerm, LongTermMemory longTerm, SqliteConnection conn)
+    private MemoryManager(ShortTermMemory shortTerm, MidTermMemory midTerm, LongTermMemory longTerm, AutobiographyStore autobiography, SqliteConnection conn)
     {
         ShortTerm = shortTerm;
         MidTerm = midTerm;
         LongTerm = longTerm;
+        Autobiography = autobiography;
         _conn = conn;
     }
 
@@ -39,9 +41,10 @@ public class MemoryManager : IDisposable
         var shortTerm = new ShortTermMemory(shortTermMaxSize);
         var midTerm = new MidTermMemory(conn);
         var longTerm = new LongTermMemory(conn);
+        var autobiography = new AutobiographyStore(conn);
         longTerm.ForgetExpired();
 
-        return new MemoryManager(shortTerm, midTerm, longTerm, conn);
+        return new MemoryManager(shortTerm, midTerm, longTerm, autobiography, conn);
     }
 
     public void AddToShortTerm(Message msg) => ShortTerm.Add(msg);
