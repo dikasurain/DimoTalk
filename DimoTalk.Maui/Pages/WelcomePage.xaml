@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DimoTalk.Maui.Pages.WelcomePage"
+             Title="滴墨讲"
+             BackgroundColor="{StaticResource PageBackground}"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="24,32,24,24">
+
+        <!-- 顶部印章 Logo -->
+        <VerticalStackLayout Grid.Row="0" HorizontalOptions="Center" Spacing="10">
+            <Border WidthRequest="72" HeightRequest="72" StrokeThickness="2"
+                    Stroke="{StaticResource Cinnabar}"
+                    StrokeShape="RoundRectangle 8"
+                    BackgroundColor="{StaticResource Cinnabar}"
+                    HorizontalOptions="Center">
+                <Label Text="墨" FontSize="34" FontAttributes="Bold"
+                       TextColor="#F5F2EA"
+                       HorizontalOptions="Center" VerticalOptions="Center"/>
+            </Border>
+            <Label Text="滴墨讲" FontSize="22" FontAttributes="Bold"
+                   TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center"/>
+            <Label Text="初始化向导 · 仅需两步" FontSize="12"
+                   TextColor="{StaticResource InkFaint}" HorizontalOptions="Center"/>
+        </VerticalStackLayout>
+
+        <!-- 中间表单 -->
+        <ScrollView Grid.Row="1" Margin="0,24,0,0">
+            <VerticalStackLayout Spacing="14">
+
+                <!-- 步骤 1：API Key -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10" Padding="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Border WidthRequest="24" HeightRequest="24"
+                                    StrokeShape="RoundRectangle 12"
+                                    BackgroundColor="{StaticResource Cinnabar}">
+                                <Label Text="1" FontSize="13" FontAttributes="Bold"
+                                       TextColor="#F5F2EA"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Text="配置 API Key" FontSize="14" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label Text="选择服务商并填入密钥，用于 AI 对话"
+                               FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                        <Picker x:Name="ProviderPicker" Title="选择服务商"
+                                ItemDisplayBinding="{Binding Name}"
+                                TextColor="{StaticResource TextPrimary}"/>
+                        <Entry x:Name="ApiKeyEntry" Placeholder="sk-…" IsPassword="True"
+                               PlaceholderColor="{StaticResource InkFaint}"
+                               TextColor="{StaticResource TextPrimary}"
+                               ClearButtonVisibility="WhileEditing"/>
+                        <Label x:Name="WebsiteLink" FontSize="11"
+                               TextColor="{StaticResource Primary}"
+                               TextDecorations="Underline">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnWebsiteTapped"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 步骤 2：唤醒词 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10" Padding="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Border WidthRequest="24" HeightRequest="24"
+                                    StrokeShape="RoundRectangle 12"
+                                    BackgroundColor="{StaticResource Cinnabar}">
+                                <Label Text="2" FontSize="13" FontAttributes="Bold"
+                                       TextColor="#F5F2EA"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Text="设置唤醒词" FontSize="14" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label Text="说出此词可自动唤醒语音对话"
+                               FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                        <Entry x:Name="WakeWordEntry" Text="滴墨" FontSize="16"
+                               PlaceholderColor="{StaticResource InkFaint}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <HorizontalStackLayout Spacing="10">
+                            <Border WidthRequest="8" HeightRequest="8"
+                                    StrokeShape="RoundRectangle 4"
+                                    BackgroundColor="{StaticResource OnlineGreen}"
+                                    VerticalOptions="Center"/>
+                            <Label Text="语音唤醒" FontSize="13"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   VerticalOptions="Center"/>
+                            <Switch x:Name="VoiceWakeSwitch" IsToggled="True"
+                                    HorizontalOptions="End"
+                                    OnColor="{StaticResource Cinnabar}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮 -->
+        <VerticalStackLayout Grid.Row="2" Spacing="10" Margin="0,16,0,0">
+            <Button Text="开始使用" Clicked="OnStartClicked" Style="{StaticResource PrimaryButton}"
+                    FontSize="16" HeightRequest="48"/>
+            <Label Text="提示：以上设置可随时在「设置」页面修改"
+                   FontSize="11" TextColor="{StaticResource InkFaint}"
+                   HorizontalOptions="Center"/>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

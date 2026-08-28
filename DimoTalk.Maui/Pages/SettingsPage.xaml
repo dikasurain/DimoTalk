@@ -122,6 +122,69 @@
                 </VerticalStackLayout>
             </VerticalStackLayout>
 
+            <!-- ===== 语音设置 ===== -->
+            <Label Text="语音设置" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="唤醒词" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Entry x:Name="WakeWordEntry" Placeholder="滴墨" FontSize="14"
+                               PlaceholderColor="{StaticResource InkFaint}"
+                               TextColor="{StaticResource TextPrimary}"
+                               WidthRequest="120" HorizontalOptions="End"/>
+                    </HorizontalStackLayout>
+                    <Label Text="说出此词可自动唤醒语音对话" FontSize="11"
+                           TextColor="{StaticResource TextSecondary}"/>
+                    <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}"/>
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="语音唤醒" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Switch x:Name="VoiceWakeSwitch" HorizontalOptions="End"
+                                OnColor="{StaticResource Cinnabar}"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ===== 风格/方言 ===== -->
+            <Label Text="对话风格" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="语气/方言" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center"/>
+                        <Picker x:Name="DialectPicker" Title="选择风格"
+                                ItemDisplayBinding="{Binding Name}"
+                                HorizontalOptions="End" WidthRequest="160"/>
+                    </HorizontalStackLayout>
+                    <Label x:Name="DialectDescLabel" FontSize="11"
+                           TextColor="{StaticResource TextSecondary}"/>
+                    <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}"/>
+                    <Label Text="选择后，AI 的回复会自动用所选方言/语气润色" FontSize="11"
+                           TextColor="{StaticResource InkFaint}"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- ===== 自传 ===== -->
+            <Label Text="记忆归档" Style="{StaticResource SectionHeader}" Margin="4,12,0,2"/>
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="10">
+                        <Border WidthRequest="8" HeightRequest="8" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 4"
+                                BackgroundColor="{StaticResource Cinnabar}"
+                                VerticalOptions="Center"/>
+                        <Label Text="生成我的自传" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"
+                               VerticalTextAlignment="Center"/>
+                    </HorizontalStackLayout>
+                    <Label Text="AI 会从记忆匣中提炼你的故事，写成一篇人物自述"
+                           FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                    <Button Text="📜 生成自传" Clicked="OnGenerateAutoBiographyClicked"
+                            Style="{StaticResource GhostButton}" FontSize="13" Padding="12,6"/>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- ===== 操作 ===== -->
             <HorizontalStackLayout Spacing="10" Margin="0,16,0,0">
                 <Button Text="保存配置" Clicked="OnSaveClicked" Style="{StaticResource PrimaryButton}"

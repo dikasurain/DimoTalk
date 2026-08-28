@@ -1,23 +1,31 @@
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
-/// 基于 NAudio 的音频播放器（Windows 桌面用）
-/// Android 端需用平台原生 AudioTrack 或 Plugin.Maui.Audio
+/// 音频播放器：跨平台实现
+/// Windows → NAudio.WaveOutEvent
+/// Android → Android.Media.MediaPlayer
+/// 支持 MP3（TTS 输出）和 WAV（本地提示音）
 /// </summary>
 public class AudioPlayer : IAudioPlayer, IDisposable
 {
-#if WINDOWS
-    private NAudio.Wave.WaveOutEvent? _waveOut;
-#endif
     private bool _disposed;
 
-    public Task PlayAsync(byte[] audioBytes, CancellationToken ct = default)
+#if WINDOWS
+    private NAudio.Wave.WaveOutEvent? _waveOut;
+#else
+    private Android.Media.MediaPlayer? _mediaPlayer;
+#endif
+
+    public async Task PlayAsync(byte[] audioBytes, CancellationToken ct = default)
     {
 #if WINDOWS
-        return Task.Run(() =>
+        await Task.Run(() =>
         {
             using var ms = new MemoryStream(audioBytes);
-            using var reader = new NAudio.Wave.Mp3FileReader(ms);
+            NAudio.Wave.IWaveReader reader;
+            try { reader = new NAudio.Wave.Mp3FileReader(ms); }
+            catch { ms.Position = 0; reader = new NAudio.Wave.AudioFileReader(ms); }
+
             _waveOut = new NAudio.Wave.WaveOutEvent();
             _waveOut.Init(reader);
 
@@ -29,8 +37,38 @@ public class AudioPlayer : IAudioPlayer, IDisposable
             tcs.Task.Wait();
         }, ct);
 #else
-        throw new PlatformNotSupportedException(
-            "Android 平台音频播放待实现。需用 Android.Media.AudioTrack 或 Plugin.Maui.Audio。");
+        await Task.Run(() =>
+        {
+            try
+            {
+                try { _mediaPlayer?.Stop(); _mediaPlayer?.Release(); } catch { }
+
+                // MediaPlayer 需要文件路径，写临时文件
+                var ext = audioBytes.Length > 4 && audioBytes[0] == 'R' && audioBytes[1] == 'I' ? ".wav" : ".mp3";
+                var tempFile = Path.Combine(FileSystem.CacheDirectory, $"dimotalk_play_{Guid.NewGuid():N}{ext}");
+                File.WriteAllBytes(tempFile, audioBytes);
+
+                _mediaPlayer = new Android.Media.MediaPlayer();
+                _mediaPlayer.SetDataSource(tempFile);
+                _mediaPlayer.Prepare();
+
+                var tcs = new TaskCompletionSource<bool>();
+                _mediaPlayer.Completion += (s, e) => { tcs.TrySetResult(true); try { File.Delete(tempFile); } catch { } };
+
+                ct.Register(() =>
+                {
+                    try { _mediaPlayer?.Stop(); } catch { }
+                    tcs.TrySetCanceled();
+                });
+
+                _mediaPlayer.Start();
+                tcs.Task.Wait();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"播放失败: {ex.Message}");
+            }
+        }, ct);
 #endif
     }
 
@@ -41,6 +79,8 @@ public class AudioPlayer : IAudioPlayer, IDisposable
         if (_disposed) return;
 #if WINDOWS
         _waveOut?.Dispose();
+#else
+        try { _mediaPlayer?.Release(); } catch { }
 #endif
         _disposed = true;
     }

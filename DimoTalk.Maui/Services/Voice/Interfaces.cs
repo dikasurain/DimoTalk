@@ -7,14 +7,16 @@ public enum VoiceState
 {
     /// <summary>空闲：不监听，需用户手动启动</summary>
     Idle,
-    /// <summary>监听唤醒词中</summary>
+    /// <summary>监听唤醒词中（ContinuousAudioCapture 已启动）</summary>
     Listening,
     /// <summary>唤醒词已触发，正在录制用户问题</summary>
     Recording,
     /// <summary>正在 ASR + GPT 处理</summary>
     Processing,
-    /// <summary>正在 TTS 合成与播放</summary>
+    /// <summary>正在 TTS 合成与播放（期间 VAD 检测 barge-in）</summary>
     Reply,
+    /// <summary>热对话窗口：TTS 刚播完，8 秒内 VAD 检测到语音直接录音，无需唤醒词</summary>
+    HotConversation,
 }
 
 /// <summary>

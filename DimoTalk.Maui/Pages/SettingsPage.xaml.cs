@@ -6,6 +6,7 @@ namespace DimoTalk.Maui.Pages;
 public partial class SettingsPage : ContentPage
 {
     private UserAiConfig _config = UserAiConfig.Load();
+    private DialectInfo? _currentDialect;
 
     public SettingsPage()
     {
@@ -17,6 +18,21 @@ public partial class SettingsPage : ContentPage
         ProviderPicker.SelectedItem = current;
         UpdateProviderDescription(current);
 
+        // 方言/风格下拉
+        DialectPicker.ItemsSource = DialectRegistry.All.ToList();
+        var dialectKey = Preferences.Get("dialect", DialectRegistry.Mandarin.Key);
+        _currentDialect = DialectRegistry.FindByKey(dialectKey);
+        DialectPicker.SelectedItem = _currentDialect;
+        DialectDescLabel.Text = _currentDialect.Description;
+        DialectPicker.SelectedIndexChanged += (_, _) =>
+        {
+            if (DialectPicker.SelectedItem is DialectInfo d)
+            {
+                _currentDialect = d;
+                DialectDescLabel.Text = d.Description;
+            }
+        };
+
         // API Key
         ApiKeyEntry.Text = _config.ApiKey;
         EndpointEntry.Text = _config.EndpointOverride;
@@ -27,6 +43,10 @@ public partial class SettingsPage : ContentPage
         WhisperModelEntry.Text = _config.WhisperModel;
         TtsModelEntry.Text = _config.TtsModel;
         TtsVoicePicker.SelectedItem = _config.TtsVoice;
+
+        // 语音设置
+        WakeWordEntry.Text = Preferences.Get("wake_word", "滴墨");
+        VoiceWakeSwitch.IsToggled = Preferences.Get("voice_wake_enabled", false);
     }
 
     private void OnProviderChanged(object? sender, EventArgs e)
@@ -100,10 +120,69 @@ public partial class SettingsPage : ContentPage
 
         _config.Save();
 
-        // 兼容旧字段（让 ChatPage 的 API Key 检查能继续工作）
+        // 兼容旧字段
         Preferences.Set("openai_api_key", _config.ApiKey);
 
+        // 语音设置
+        var wakeWord = WakeWordEntry.Text?.Trim();
+        Preferences.Set("wake_word", string.IsNullOrEmpty(wakeWord) ? "滴墨" : wakeWord);
+        Preferences.Set("voice_wake_enabled", VoiceWakeSwitch.IsToggled);
+
+        // 方言/风格
+        if (DialectPicker.SelectedItem is DialectInfo d)
+            Preferences.Set("dialect", d.Key);
+
         DisplayAlert("提示", "配置已保存", "确定");
+    }
+
+    private async void OnGenerateAutoBiographyClicked(object? sender, EventArgs e)
+    {
+        var apiKey = Preferences.Get("openai_api_key", string.Empty);
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            await DisplayAlert("提示", "请先在上方配置 API Key", "确定");
+            return;
+        }
+
+        var userId = Preferences.Get("user_id", Guid.NewGuid().ToString());
+        Preferences.Set("user_id", userId);
+
+        try
+        {
+            var ai = Handler?.MauiContext?.Services.GetService<DimoTalk.Maui.Services.AutobiographyService>();
+            if (ai == null)
+            {
+                await DisplayAlert("提示", "服务未就绪，请重启应用", "确定");
+                return;
+            }
+
+            // 显示 Loading 弹窗
+            var loadingPage = new ContentPage
+            {
+                Content = new VerticalStackLayout
+                {
+                    Padding = 30,
+                    Spacing = 16,
+                    Children =
+                    {
+                        new Label { Text = "研墨润笔中…", FontSize = 16, HorizontalOptions = LayoutOptions.Center },
+                        new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Center },
+                    }
+                }
+            };
+            await Navigation.PushModalAsync(loadingPage);
+
+            var text = await ai.GenerateAsync(userId);
+
+            await Navigation.PopModalAsync();
+
+            // 显示结果
+            await DisplayAlert("📜 我的自述", text, "好的");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("生成失败", ex.Message, "确定");
+        }
     }
 
     private void OnResetClicked(object? sender, EventArgs e)
@@ -117,5 +196,12 @@ public partial class SettingsPage : ContentPage
         WhisperModelEntry.Text = _config.WhisperModel;
         TtsModelEntry.Text = _config.TtsModel;
         TtsVoicePicker.SelectedItem = _config.TtsVoice;
+        WakeWordEntry.Text = "滴墨";
+        VoiceWakeSwitch.IsToggled = false;
+        DialectPicker.SelectedItem = DialectRegistry.Mandarin;
+
+        Preferences.Set("wake_word", "滴墨");
+        Preferences.Set("voice_wake_enabled", false);
+        Preferences.Set("dialect", DialectRegistry.Mandarin.Key);
     }
 }

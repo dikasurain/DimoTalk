@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using DimoTalk.Maui.Models;
 using DimoTalk.Maui.Services;
 using DimoTalk.Maui.Services.Voice;
@@ -9,7 +10,7 @@ public partial class ChatPage : ContentPage
     private readonly ChatService? _chatService;
     private readonly VoiceConversationManager? _voiceManager;
     private readonly Func<string> _getApiKey;
-    private readonly List<ChatBubble> _messages = new();
+    private readonly ObservableCollection<ChatBubble> _messages = new();
 
     // 动画句柄
     private CancellationTokenStartInfo? _sealBreathHandle;
@@ -53,10 +54,10 @@ public partial class ChatPage : ContentPage
 
     private void RefreshList(bool scrollToEnd = true)
     {
-        MessagesView.ItemsSource = null;
-        MessagesView.ItemsSource = _messages;
+        // ObservableCollection 增量更新会自动刷新 ListView
+        // 不再 ItemsSource = null → 强制重置（会导致滚动位置回顶）
         if (scrollToEnd && _messages.Count > 0)
-            MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: false);
+            MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: true);
     }
 
     private async void OnSendClicked(object? sender, EventArgs e)
@@ -130,7 +131,8 @@ public partial class ChatPage : ContentPage
                 VoiceButton.Text = "停止";
                 VoiceButton.BackgroundColor = (Color)Application.Current!.Resources["Cinnabar"];
                 VoiceButton.TextColor = Color.FromArgb("#F5F2EA");
-                StatusLabel.Text = "侧耳聆听 · 唤之曰「滴墨」";
+                var wakeWord = Preferences.Get("wake_word", "滴墨");
+                StatusLabel.Text = $"侧耳聆听 · 唤之曰「{wakeWord}」";
             }
             catch (Exception ex)
             {

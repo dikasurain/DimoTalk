@@ -3,22 +3,37 @@ using DimoTalk.Maui.Services;
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
-/// 语音对话编排器：状态机驱动
-/// Idle → Listening（唤醒词检测）→ Recording（用户问答录制）→ Processing（ASR+GPT）→ Reply（TTS）
+/// 语音对话编排器：状态机驱动，单一 ContinuousAudioCapture 持续录音
+///
+/// 状态流：
+/// Idle → Listening（唤醒词监听）
+///      → Recording（唤醒触发/热对话/VAD barge-in）
+///      → Processing（ASR + GPT）
+///      → Reply（TTS 播放，期间 barge-in 可打断）
+///      → HotConversation（8s 窗口，VAD 触发直接 → Recording）
+///      → Listening（热对话超时）
+///
+/// 全程 AudioRecord 不重启，零延迟切换
 /// </summary>
 public class VoiceConversationManager : IAsyncDisposable
 {
+    private readonly ContinuousAudioCapture _capture;
     private readonly IWakeWordDetector _wakeWordDetector;
     private readonly IAsrService _asr;
     private readonly ITtsService _tts;
     private readonly IAudioPlayer _player;
     private readonly ChatService _chatService;
-    private readonly VoiceRecorder _recorder = new();
+    private readonly VoiceRecorder _recorder;
 
     private VoiceState _state = VoiceState.Idle;
     private CancellationTokenSource? _cts;
     private readonly object _stateLock = new();
     private bool _disposed;
+
+    // Barge-in / 热对话窗口
+    private System.Timers.Timer? _hotWindowTimer;
+    private CancellationTokenSource? _replyCts;
+    private const int HotWindowSeconds = 8;
 
     public VoiceState State
     {
@@ -26,19 +41,24 @@ public class VoiceConversationManager : IAsyncDisposable
     }
 
     public event EventHandler<VoiceState>? StateChanged;
+    public event EventHandler<string>? StatusMessage;
 
     public VoiceConversationManager(
+        ContinuousAudioCapture capture,
         IWakeWordDetector wakeWordDetector,
         IAsrService asr,
         ITtsService tts,
         IAudioPlayer player,
-        ChatService chatService)
+        ChatService chatService,
+        VoiceRecorder recorder)
     {
+        _capture = capture;
         _wakeWordDetector = wakeWordDetector;
         _asr = asr;
         _tts = tts;
         _player = player;
         _chatService = chatService;
+        _recorder = recorder;
         _recorder.RecordingCompleted += OnRecordingCompleted;
     }
 
@@ -52,21 +72,49 @@ public class VoiceConversationManager : IAsyncDisposable
         StateChanged?.Invoke(this, state);
     }
 
+    private void EmitStatus(string msg)
+    {
+        StatusMessage?.Invoke(this, msg);
+    }
+
+    // ─────────── 启动 / 停止 ───────────
+
     public async Task StartAsync(string userId, CancellationToken ct = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        SetState(VoiceState.Listening);
 
-        // Android/iOS 首次启动需先解压模型（内部有去重检查，二次调用是 No-op）
+        // 1️⃣ 启动单一音频采集源（持有麦克风，全程不释放）
+        await _capture.StartAsync();
+
+        // 2️⃣ 设置唤醒词
+        var wakeWord = Preferences.Default.Get("wake_word", "滴墨");
+        _wakeWordDetector.WakeWord = wakeWord;
+
+        // 3️⃣ 解压 Vosk 模型（首次）
         if (_wakeWordDetector is VoskWakeWordDetector vosk)
             await vosk.EnsureModelExtractedAsync();
 
-        await _wakeWordDetector.StartAsync(OnWakeWordDetected, _cts.Token);
+        // 4️⃣ 进入 Listening
+        await EnterListeningAsync();
+        EmitStatus($"侧耳聆听 · 唤之曰「{wakeWord}」");
     }
 
-    /// <summary>停止语音对话（用户点击"停止"按钮或应用进入后台）</summary>
     public async Task StopAsync()
     {
+        CancelHotWindow();
+
+        // 打断 TTS 播放
+        try { _replyCts?.Cancel(); } catch { }
+
+        // 停录音
+        try { await _recorder.StopAsync(); } catch { }
+
+        // 停唤醒词
+        try { await _wakeWordDetector.StopAsync(); } catch { }
+
+        // 停音频采集
+        try { await _capture.StopAsync(); } catch { }
+
         if (_cts != null)
         {
             _cts.Cancel();
@@ -74,41 +122,118 @@ public class VoiceConversationManager : IAsyncDisposable
             _cts = null;
         }
 
-        try { await _wakeWordDetector.StopAsync(); } catch { }
         SetState(VoiceState.Idle);
     }
 
-    /// <summary>
-    /// 唤醒词触发：播放提示音 + 切换到录音状态
-    /// </summary>
-    private async Task OnWakeWordDetected()
+    // ─────────── 状态切换 ───────────
+
+    private async Task EnterListeningAsync()
     {
-        if (State != VoiceState.Listening) return;
+        SetState(VoiceState.Listening);
 
-        SetState(VoiceState.Recording);
-        await _wakeWordDetector.StopAsync();
+        // 取消之前的录音订阅
+        try { await _recorder.StopAsync(); } catch { }
 
-        // 提示音（叮）
-        await PlayPromptToneAsync();
-
-        // 开始录音（持续到静音 2 秒）
-        _recorder.StartRecording();
+        // 启动唤醒词检测（订阅同一个 AudioCapture）
+        await _wakeWordDetector.StartAsync(OnWakeOrHotTriggeredAsync, _cts?.Token ?? default);
     }
 
-    /// <summary>
-    /// 录音完成 → ASR → GPT → TTS → 播放 → 回到 Listening
-    /// </summary>
+    private async Task EnterHotConversationAsync()
+    {
+        SetState(VoiceState.HotConversation);
+        CancelHotWindow();
+
+        // 启动 8 秒热对话定时器
+        _hotWindowTimer = new System.Timers.Timer(HotWindowSeconds * 1000) { AutoReset = false };
+        _hotWindowTimer.Elapsed += async (_, _) =>
+        {
+            CancelHotWindow();
+            if (State == VoiceState.HotConversation)
+                await EnterListeningAsync();
+        };
+        _hotWindowTimer.Start();
+
+        // 同时订阅 VAD —— 检测到语音直接开始录音
+        _capture.Subscribe(OnHotConversationVadPcm);
+        EmitStatus("热对话中 · 直接说话");
+    }
+
+    private void CancelHotWindow()
+    {
+        try { _hotWindowTimer?.Stop(); _hotWindowTimer?.Dispose(); } catch { }
+        _hotWindowTimer = null;
+        _capture.Unsubscribe(OnHotConversationVadPcm);
+    }
+
+    private DateTime _hotLastSpeech = DateTime.MinValue;
+    private void OnHotConversationVadPcm(byte[] pcm)
+    {
+        // 简单 VAD：RMS 超过阈值即触发
+        double sum = 0;
+        var samples = pcm.Length / 2;
+        for (int i = 0; i < pcm.Length; i += 2)
+        {
+            short s = (short)(pcm[i] | (pcm[i + 1] << 8));
+            sum += s * s;
+        }
+        double rms = Math.Sqrt(sum / Math.Max(samples, 1));
+        if (rms > 500) _hotLastSpeech = DateTime.Now;
+
+        // 连续 300ms 检测到语音 → 触发录音
+        if ((DateTime.Now - _hotLastSpeech).TotalMilliseconds < 300 && rms > 500)
+        {
+            CancelHotWindow();
+            _ = StartRecordingNowAsync(preRoll: 1);
+        }
+    }
+
+    /// <summary>唤醒词触发 或 热对话 VAD 触发 → 进入录音</summary>
+    private async Task OnWakeOrHotTriggeredAsync()
+    {
+        if (State != VoiceState.Listening && State != VoiceState.HotConversation) return;
+        await StartRecordingNowAsync(preRoll: State == VoiceState.Listening ? 1 : 0);
+    }
+
+    private async Task StartRecordingNowAsync(int preRoll)
+    {
+        SetState(VoiceState.Recording);
+        CancelHotWindow();
+
+        // 停止唤醒词检测（释放它的 Vosk 订阅，但 AudioCapture 不关）
+        try { await _wakeWordDetector.StopAsync(); } catch { }
+
+        // 播放叮声提示（异步，不阻塞录音启动）
+        _ = PlayPromptToneAsync();
+
+        // 开始录音（订阅 AudioCapture，回填 preRoll 秒历史）
+        await _recorder.StartRecordingAsync(preRollSeconds: preRoll);
+    }
+
+    // ─────────── 录音完成回调 ───────────
+
     private async void OnRecordingCompleted(object? sender, byte[] wavBytes)
     {
         try
         {
             SetState(VoiceState.Processing);
+            EmitStatus("研墨构思中…");
 
             // 1. ASR
-            var text = await _asr.RecognizeAsync(wavBytes, _cts?.Token ?? default);
+            string text;
+            try
+            {
+                text = await _asr.RecognizeAsync(wavBytes, _cts?.Token ?? default);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ASR 失败: {ex.Message}");
+                text = string.Empty;
+            }
+
             if (string.IsNullOrWhiteSpace(text))
             {
-                await ReenterListeningAsync();
+                // 没识别到内容 → 回热对话窗口（还在监听）
+                await EnterHotConversationAsync();
                 return;
             }
 
@@ -117,33 +242,94 @@ public class VoiceConversationManager : IAsyncDisposable
 
             // 3. TTS
             SetState(VoiceState.Reply);
-            var audio = await _tts.SynthesizeAsync(reply, _cts?.Token ?? default);
+            EmitStatus("答曰…");
 
-            // 4. 播放
-            await _player.PlayAsync(audio, _cts?.Token ?? default);
+            _replyCts = new CancellationTokenSource();
+            var ttsAudio = await _tts.SynthesizeAsync(reply, _replyCts.Token);
 
-            // 5. 回到监听唤醒词状态
-            await ReenterListeningAsync();
+            if (_replyCts.IsCancellationRequested)
+            {
+                // 用户打断了 TTS → 跳过播放，直接进热对话
+                _replyCts.Dispose();
+                _replyCts = null;
+                await EnterHotConversationAsync();
+                return;
+            }
+
+            // 4. 播放 TTS（后台监听 barge-in）
+            await PlayWithBargeInAsync(ttsAudio, _replyCts.Token);
+
+            if (_replyCts.IsCancellationRequested)
+            {
+                _replyCts.Dispose();
+                _replyCts = null;
+                // barge-in 触发后 OnBargeInDetected 会处理进入 Recording
+                return;
+            }
+
+            try { _replyCts.Dispose(); } catch { }
+            _replyCts = null;
+
+            // 5. 播放完毕 → 进入热对话窗口（8 秒内 VAD 触发直接录音，无需唤醒词）
+            await EnterHotConversationAsync();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"语音对话失败: {ex}");
-            await ReenterListeningAsync();
+            EmitStatus($"出错了：{ex.Message}");
+            await EnterListeningAsync();
         }
     }
 
-    private async Task ReenterListeningAsync()
+    // ─────────── TTS 播放 + Barge-in ───────────
+
+    private async Task PlayWithBargeInAsync(byte[] audioBytes, CancellationToken ct)
     {
-        SetState(VoiceState.Listening);
-        if (_wakeWordDetector is VoskWakeWordDetector vosk)
+        var bargeInTriggered = false;
+
+        void OnBargeIn(byte[] pcm)
         {
-            await vosk.StartAsync(OnWakeWordDetected, _cts?.Token ?? CancellationToken.None);
+            if (ct.IsCancellationRequested || bargeInTriggered) return;
+            double sum = 0;
+            var samples = pcm.Length / 2;
+            for (int i = 0; i < pcm.Length; i += 2)
+            {
+                short s = (short)(pcm[i] | (pcm[i + 1] << 8));
+                sum += s * s;
+            }
+            double rms = Math.Sqrt(sum / Math.Max(samples, 1));
+            // TTS 播放期间，环境 RMS 突然升高 → 用户开口打断
+            if (rms > 1200)
+            {
+                bargeInTriggered = true;
+                _replyCts?.Cancel();
+            }
+        }
+
+        // 注意：ContinuousAudioCapture 一直开着，这里只是临时订阅做 barge-in 检测
+        _capture.Subscribe(OnBargeIn);
+
+        try
+        {
+            await _player.PlayAsync(audioBytes, ct);
+        }
+        catch (OperationCanceledException) { /* barge-in 打断 */ }
+        finally
+        {
+            _capture.Unsubscribe(OnBargeIn);
+        }
+
+        if (bargeInTriggered)
+        {
+            // 用户开口打断了 TTS → 直接开始录音
+            await StartRecordingNowAsync(preRoll: 1);
         }
     }
+
+    // ─────────── 辅助 ───────────
 
     private async Task PlayPromptToneAsync()
     {
-        // 简单：用 sine 波生成 880Hz 短音 100ms（避免依赖外部资源文件）
         var sampleRate = 16000;
         var durationMs = 100;
         var samples = sampleRate * durationMs / 1000;
@@ -155,23 +341,15 @@ public class VoiceConversationManager : IAsyncDisposable
             bytes[i * 2] = (byte)(sample & 0xFF);
             bytes[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
         }
-
-        // 转 WAV
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
-        writer.Write("RIFF".ToCharArray());
-        writer.Write(36 + bytes.Length);
+        writer.Write("RIFF".ToCharArray()); writer.Write(36 + bytes.Length);
         writer.Write("WAVE".ToCharArray());
-        writer.Write("fmt ".ToCharArray());
-        writer.Write(16);
-        writer.Write((short)1);
-        writer.Write((short)1);
-        writer.Write(sampleRate);
-        writer.Write(sampleRate * 2);
-        writer.Write((short)2);
-        writer.Write((short)16);
-        writer.Write("data".ToCharArray());
-        writer.Write(bytes.Length);
+        writer.Write("fmt ".ToCharArray()); writer.Write(16);
+        writer.Write((short)1); writer.Write((short)1);
+        writer.Write(sampleRate); writer.Write(sampleRate * 2);
+        writer.Write((short)2); writer.Write((short)16);
+        writer.Write("data".ToCharArray()); writer.Write(bytes.Length);
         writer.Write(bytes);
 
         await _player.PlayPromptAsync(ms.ToArray());
@@ -184,14 +362,9 @@ public class VoiceConversationManager : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
-
-        if (_cts != null)
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-        }
-
+        await StopAsync();
         if (_wakeWordDetector is IAsyncDisposable d) await d.DisposeAsync();
         if (_player is IDisposable dp) dp.Dispose();
+        _recorder.Dispose();
     }
 }

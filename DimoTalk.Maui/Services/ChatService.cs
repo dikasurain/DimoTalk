@@ -34,7 +34,14 @@ public class ChatService
         var ltmHits = await ltmTask;
         var midSummaries = await midTask;
 
-        var messages = PromptBuilder.ToOpenAIMessages(userInput, _memoryManager.ShortTerm, midSummaries, ltmHits);
+        // 读取方言/语气偏好 → 注入 system prompt 末尾的硬性约束
+        var dialectKey = Preferences.Default.Get("dialect", DialectRegistry.Mandarin.Key);
+        var dialect = DialectRegistry.FindByKey(dialectKey);
+        var dialectConstraint = dialect.SystemConstraint;
+
+        var messages = PromptBuilder.ToOpenAIMessages(
+            userInput, _memoryManager.ShortTerm, midSummaries, ltmHits,
+            dialectConstraint: dialectConstraint);
         var reply = await _ai.ChatAsync(messages);
 
         var assistantMsg = new Message { Role = MessageRole.Assistant, Content = reply, Timestamp = DateTime.Now };

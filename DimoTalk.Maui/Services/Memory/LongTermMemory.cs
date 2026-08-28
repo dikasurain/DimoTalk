@@ -88,6 +88,23 @@ public class LongTermMemory
         return hits.Take(topK).ToList();
     }
 
+    public List<string> ListAll(string userId, int limit = 200)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT content FROM long_term_memories
+            WHERE user_id = @uid AND confidence >= 0.4
+            ORDER BY created_at DESC LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var list = new List<string>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) list.Add(reader.GetString(0));
+        return list;
+    }
+
     public void ForgetExpired(int days = 90)
     {
         var cutoff = DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeMilliseconds();

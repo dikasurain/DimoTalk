@@ -1,87 +1,126 @@
 namespace DimoTalk.Maui.Services.Voice;
 
 /// <summary>
-/// 录音服务：持续录音直到静音 2 秒或超过 30 秒
-/// 返回 16kHz 单声道 PCM（适合 Whisper）
+/// 录音服务 — 订阅 ContinuousAudioCapture 的 PCM 流，支持 VAD 静音断句 + 历史回填
 /// </summary>
-public class VoiceRecorder
+public class VoiceRecorder : IDisposable
 {
-#if WINDOWS
-    private readonly NAudio.Wave.WaveInEvent _waveIn = new()
-    {
-        WaveFormat = new NAudio.Wave.WaveFormat(16000, 1),
-        BufferMilliseconds = 100,
-    };
+    public event EventHandler<byte[]>? RecordingCompleted;
+    public event EventHandler<double>? AudioLevelChanged;
+    public bool IsRecording { get; private set; }
+
+    private readonly ContinuousAudioCapture _capture;
     private readonly List<byte> _buffer = new();
     private DateTime _lastSpeech = DateTime.MinValue;
-    private bool _stopped;
-#endif
+    private System.Timers.Timer? _vadTimer;
+    private readonly object _bufLock = new();
 
-    public event EventHandler<byte[]>? RecordingCompleted;
+    private const int SilenceTimeoutSeconds = 1500; // ms，降低阈值提高响应
+    private const int MaxRecordingSeconds = 30;
+    private const double SpeechThreshold = 500; // RMS
 
-    public void StartRecording()
+    private DateTime _startTime;
+
+    public VoiceRecorder(ContinuousAudioCapture capture)
     {
-#if WINDOWS
-        _buffer.Clear();
-        _lastSpeech = DateTime.Now;
-        _stopped = false;
-
-        _waveIn.DataAvailable += OnDataAvailable;
-        _waveIn.StartRecording();
-#else
-        throw new PlatformNotSupportedException(
-            "Android 平台录音待实现。模型已就位，需用 Android.Media.AudioRecord 提供录音数据。");
-#endif
-    }
-
-#if WINDOWS
-    private void OnDataAvailable(object? sender, NAudio.Wave.WaveInEventArgs e)
-    {
-        if (_stopped) return;
-
-        _buffer.AddRange(e.Buffer.Take(e.BytesRecorded));
-        var now = DateTime.Now;
-
-        // 检测是否有语音（简单能量阈值）
-        if (HasSpeech(e.Buffer, e.BytesRecorded)) _lastSpeech = now;
-
-        if ((now - _lastSpeech).TotalSeconds > 2 || _buffer.Count > 16000 * 2 * 30)
-        {
-            Stop();
-        }
-    }
-
-    private static bool HasSpeech(byte[] buffer, int length)
-    {
-        double sum = 0;
-        for (int i = 0; i < length; i += 2)
-        {
-            short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
-            sum += sample * sample;
-        }
-        var rms = Math.Sqrt(sum / (length / 2));
-        return rms > 500;
-    }
-#endif
-
-    public void Stop()
-    {
-#if WINDOWS
-        if (_stopped) return;
-        _stopped = true;
-
-        _waveIn.StopRecording();
-        _waveIn.DataAvailable -= OnDataAvailable;
-
-        var wavBytes = ToWavBytes(_buffer.ToArray());
-        RecordingCompleted?.Invoke(this, wavBytes);
-        _buffer.Clear();
-#endif
+        _capture = capture;
     }
 
     /// <summary>
-    /// 裸 PCM 转 WAV 字节数组（含 RIFF 头）
+    /// 开始录制。可选回填历史音频秒数（捕获唤醒被截断的语音开头）。
     /// </summary>
+    public async Task StartRecordingAsync(int preRollSeconds = 0)
+    {
+        if (IsRecording) return;
+        IsRecording = true;
+
+        lock (_bufLock) _buffer.Clear();
+        _lastSpeech = DateTime.Now;
+        _startTime = DateTime.Now;
+
+        // 回填历史
+        if (preRollSeconds > 0)
+        {
+            var history = _capture.GetHistorySeconds(preRollSeconds);
+            if (history.Length > 0)
+            {
+                lock (_bufLock) _buffer.AddRange(history);
+            }
+        }
+
+        // 订阅 PCM
+        _capture.Subscribe(OnPcmChunk);
+
+        // VAD 定时器（200ms 粒度）
+        _vadTimer = new System.Timers.Timer(200) { AutoReset = true };
+        _vadTimer.Elapsed += (s, e) => CheckVad();
+        _vadTimer.Start();
+
+        await Task.CompletedTask;
+    }
+
+    public async Task StopAsync()
+    {
+        if (!IsRecording) return;
+        IsRecording = false;
+
+        // 取消订阅
+        _capture.Unsubscribe(OnPcmChunk);
+
+        try { _vadTimer?.Stop(); _vadTimer?.Dispose(); } catch { }
+        _vadTimer = null;
+
+        byte[] wav;
+        lock (_bufLock)
+        {
+            wav = ToWavBytes(_buffer.ToArray());
+            _buffer.Clear();
+        }
+
+        RecordingCompleted?.Invoke(this, wav);
+        await Task.CompletedTask;
+    }
+
+    private void OnPcmChunk(byte[] pcm)
+    {
+        if (!IsRecording) return;
+
+        lock (_bufLock) _buffer.AddRange(pcm);
+
+        // RMS → 电平
+        double rms = ComputeRms(pcm, pcm.Length);
+        AudioLevelChanged?.Invoke(this, rms / 32768.0);
+        if (rms > SpeechThreshold) _lastSpeech = DateTime.Now;
+    }
+
+    private void CheckVad()
+    {
+        if (!IsRecording) return;
+        var now = DateTime.Now;
+        var elapsedMs = (now - _lastSpeech).TotalMilliseconds;
+        var totalSecs = (now - _startTime).TotalSeconds;
+
+        // 先保证最少录 0.5 秒（避免刚开口就停）
+        if (totalSecs < 0.5) return;
+
+        if (elapsedMs > SilenceTimeoutSeconds || totalSecs > MaxRecordingSeconds)
+        {
+            _ = StopAsync();
+        }
+    }
+
+    private static double ComputeRms(byte[] buf, int len)
+    {
+        double sum = 0;
+        var samples = len / 2;
+        for (int i = 0; i < len; i += 2)
+        {
+            short s = (short)(buf[i] | (buf[i + 1] << 8));
+            sum += s * s;
+        }
+        return Math.Sqrt(sum / Math.Max(samples, 1));
+    }
+
     private static byte[] ToWavBytes(byte[] pcm)
     {
         using var ms = new MemoryStream();
@@ -93,13 +132,18 @@ public class VoiceRecorder
         writer.Write(16);
         writer.Write((short)1);  // PCM
         writer.Write((short)1);  // mono
-        writer.Write(16000);
-        writer.Write(16000 * 2);
+        writer.Write(ContinuousAudioCapture.SampleRate);
+        writer.Write(ContinuousAudioCapture.BytesPerSecond);
         writer.Write((short)2);
         writer.Write((short)16);
         writer.Write("data".ToCharArray());
         writer.Write(pcm.Length);
         writer.Write(pcm);
         return ms.ToArray();
+    }
+
+    public void Dispose()
+    {
+        if (IsRecording) { try { StopAsync().Wait(1000); } catch { } }
     }
 }
