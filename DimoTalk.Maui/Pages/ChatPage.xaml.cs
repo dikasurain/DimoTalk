@@ -56,6 +56,15 @@ public partial class ChatPage : ContentPage
             MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: false);
     }
 
+    private void OnEntryFocused(object? sender, FocusEventArgs e)
+    {
+        // 键盘弹起 → 消息滚到底，确保最后一条不被键盘盖住
+        if (_messages.Count > 0)
+            MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: true);
+    }
+
+    private void OnEntryUnfocused(object? sender, FocusEventArgs e) { }
+
     private void RefreshList(bool scrollToEnd = true)
     {
         // ObservableCollection 增量更新会自动刷新 ListView
