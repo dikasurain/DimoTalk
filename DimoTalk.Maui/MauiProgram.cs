@@ -49,16 +49,17 @@ public static class MauiProgram
         builder.Services.AddSingleton<AudioPlayer>();
         builder.Services.AddSingleton<IWakeWordDetector, VoskWakeWordDetector>();
 
-        // ChatService + AutobiographyService（均依赖 MemoryManager）
-        builder.Services.AddSingleton<ChatService>(sp =>
-        {
-            var ai = sp.GetRequiredService<OpenAIClient>();
-            return new ChatService(MemoryInstance, ai);
-        });
+        // ChatService + AutobiographyService（均依赖 MemoryManager；ChatService 借 AutobiographyService 生成日记）
         builder.Services.AddSingleton<AutobiographyService>(sp =>
         {
             var ai = sp.GetRequiredService<OpenAIClient>();
             return new AutobiographyService(MemoryInstance!, ai);
+        });
+        builder.Services.AddSingleton<ChatService>(sp =>
+        {
+            var ai = sp.GetRequiredService<OpenAIClient>();
+            var auto = sp.GetService<AutobiographyService>();
+            return new ChatService(MemoryInstance, ai, auto);
         });
 
         builder.Services.AddSingleton<VoiceConversationManager>(sp =>

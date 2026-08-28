@@ -6,8 +6,11 @@ namespace DimoTalk.Maui.Services;
 /// <summary>自传章节</summary>
 public record ChapterInfo(int Index, string Title, string Content, string CreatedAt);
 
+/// <summary>日记条目</summary>
+public record DiaryInfo(string Date, string Content, string UpdatedAt);
+
 /// <summary>
-/// 自传章节 + 主人公画像的 SQLite 存储
+/// 自传章节 + 主人公画像 + 日记 的 SQLite 存储
 /// 表挂在 dimotalk_memory.db，由 MemoryManager 初始化连接时一并建表
 /// </summary>
 public class AutobiographyStore
@@ -38,6 +41,14 @@ public class AutobiographyStore
                 user_id TEXT PRIMARY KEY,
                 profile_json TEXT NOT NULL,
                 updated_at TEXT DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS diary (
+                user_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                content TEXT NOT NULL,
+                updated_at TEXT DEFAULT (datetime('now','localtime')),
+                PRIMARY KEY (user_id, date)
             );
         """;
         cmd.ExecuteNonQuery();
@@ -128,5 +139,52 @@ public class AutobiographyStore
         cmd.CommandText = "DELETE FROM protagonist_profile WHERE user_id = @uid";
         cmd.Parameters.AddWithValue("@uid", userId);
         cmd.ExecuteNonQuery();
+    }
+
+    // ── 日记 ──
+
+    /// <summary>按日期 upsert 日记（同一天多次生成 → 合并重写）</summary>
+    public void SaveDiary(string userId, string date, string content)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO diary (user_id, date, content, updated_at)
+            VALUES (@uid, @date, @content, datetime('now','localtime'))
+            ON CONFLICT(user_id, date) DO UPDATE SET
+                content = @content, updated_at = datetime('now','localtime')
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@date", date);
+        cmd.Parameters.AddWithValue("@content", content);
+        cmd.ExecuteNonQuery();
+    }
+
+    public DiaryInfo? LoadDiary(string userId, string date)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT date, content, updated_at FROM diary WHERE user_id = @uid AND date = @date";
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@date", date);
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return null;
+        return new DiaryInfo(reader.GetString(0), reader.GetString(1), reader.GetString(2));
+    }
+
+    /// <summary>最近 N 天有日记的日期（倒序）</summary>
+    public List<DiaryInfo> LoadDiaryList(string userId, int limit = 30)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT date, content, updated_at FROM diary
+            WHERE user_id = @uid ORDER BY date DESC LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@uid", userId);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var list = new List<DiaryInfo>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add(new DiaryInfo(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        return list;
     }
 }

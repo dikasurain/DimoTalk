@@ -68,6 +68,26 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- ═══ 日记本 ═══ -->
+            <Border StrokeThickness="1" Stroke="{StaticResource Divider}"
+                    StrokeShape="RoundRectangle 10"
+                    BackgroundColor="{StaticResource Surface}" Padding="16,14">
+                <VerticalStackLayout Spacing="10">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="日记本" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource InkHeavy}"/>
+                        <Label Text="· 对话收尾时自动写成" FontSize="11"
+                               TextColor="{StaticResource InkFaint}" VerticalOptions="End"/>
+                    </HorizontalStackLayout>
+
+                    <VerticalStackLayout x:Name="DiaryList" Spacing="6"/>
+
+                    <Button x:Name="WriteDiaryButton" Text="补写今日日记" Clicked="OnWriteDiaryClicked"
+                            CornerRadius="6" Padding="0,6" FontSize="13"
+                            BackgroundColor="{StaticResource InkWash}" TextColor="{StaticResource InkMedium}"/>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- ═══ 本体 Soul ═══ -->
             <Border StrokeThickness="1" Stroke="{StaticResource Divider}"
                     StrokeShape="RoundRectangle 10"

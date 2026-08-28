@@ -47,6 +47,128 @@ public partial class MemoryPage : ContentPage
         base.OnAppearing();
         LoadProfile();
         LoadChapters();
+        LoadDiaries();
+    }
+
+    // ═══ 日记本 ═══
+
+    private void LoadDiaries()
+    {
+        if (_memory == null) return;
+        var diaries = _memory.Autobiography.LoadDiaryList(GetUserId());
+        DiaryList.Children.Clear();
+
+        if (diaries.Count == 0)
+        {
+            DiaryList.Children.Add(new Label
+            {
+                Text = "还没有日记。聊天后离开对话页，我会自动把当天写成日记。",
+                FontSize = 12,
+                TextColor = (Color)Application.Current!.Resources["TextSecondary"],
+            });
+            return;
+        }
+
+        foreach (var d in diaries)
+        {
+            var row = new Border
+            {
+                StrokeThickness = 1,
+                Stroke = (Color)Application.Current!.Resources["Divider"],
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(6) },
+                BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
+                Padding = new Thickness(12, 8),
+                Content = new HorizontalStackLayout
+                {
+                    Spacing = 8,
+                    Children =
+                    {
+                        new Label
+                        {
+                            Text = FormatDiaryDate(d.Date),
+                            FontSize = 13,
+                            FontAttributes = FontAttributes.Bold,
+                            TextColor = (Color)Application.Current.Resources["InkMedium"],
+                            VerticalOptions = LayoutOptions.Center,
+                        },
+                        new Label
+                        {
+                            Text = d.Content.Replace("\n", " "),
+                            FontSize = 12,
+                            TextColor = (Color)Application.Current.Resources["TextSecondary"],
+                            LineBreakMode = LineBreakMode.TailTruncation,
+                            MaximumWidthRequest = 240,
+                            VerticalOptions = LayoutOptions.Center,
+                        },
+                    },
+                },
+            };
+            var captured = d;
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += async (_, _) => await OpenDiaryAsync(captured);
+            row.GestureRecognizers.Add(tap);
+            DiaryList.Children.Add(row);
+        }
+    }
+
+    private static string FormatDiaryDate(string date)
+    {
+        if (DateTime.TryParse(date, out var dt))
+            return $"{dt:M月d日} {dt:ddd}";
+        return date;
+    }
+
+    private async Task OpenDiaryAsync(DiaryInfo diary)
+    {
+        var contentLabel = new Label
+        {
+            Text = diary.Content,
+            FontSize = 15,
+            LineHeight = 1.6d,
+            TextColor = (Color)Application.Current!.Resources["TextPrimary"],
+        };
+        await Shell.Current.Navigation.PushAsync(new ContentPage
+        {
+            Title = FormatDiaryDate(diary.Date),
+            BackgroundColor = (Color)Application.Current.Resources["PageBackground"],
+            Content = new ScrollView
+            {
+                Content = new StackLayout { Children = { contentLabel } },
+                Padding = new Thickness(18, 14),
+            },
+        });
+    }
+
+    private async void OnWriteDiaryClicked(object? sender, EventArgs e)
+    {
+        if (_autobiography == null || !CheckReady()) return;
+
+        // 素材：当前短期记忆里的消息
+        var msgs = _memory!.ShortTerm.Context;
+        var userMsgs = msgs.Where(m => m.Role == DimoTalk.Maui.Models.MessageRole.User).Select(m => m.Content).ToList();
+        var aiMsgs = msgs.Where(m => m.Role == DimoTalk.Maui.Models.MessageRole.Assistant).Select(m => m.Content).ToList();
+
+        if (userMsgs.Count == 0)
+        {
+            await DisplayAlert("没素材", "当前会话还没有聊过天。先去对话页聊几句，或等会话自动收尾。", "好");
+            return;
+        }
+
+        try
+        {
+            WriteDiaryButton.IsEnabled = false;
+            var diary = await _autobiography.GenerateDiaryAsync(GetUserId(), userMsgs, aiMsgs);
+            LoadDiaries();
+            await DisplayAlert("日记已写", $"{FormatDiaryDate(diary.Date)} 的日记已入册。", "好");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("写日记失败", ex.Message, "知道了");
+        }
+        finally
+        {
+            WriteDiaryButton.IsEnabled = true;
+        }
     }
 
     // ═══ 主人公画像 ═══

@@ -197,4 +197,65 @@ public class AutobiographyService
 
         return await _ai.ChatAsync(new List<ChatMessage> { new SystemChatMessage(sb.ToString()) }, temperature: 0.8);
     }
+
+    // ── 日记 ──
+
+    /// <summary>
+    /// 生成/合并当日日记：旧日记（如有）+ 本次会话消息 → 第一人称日记（200~400字）
+    /// 同一天多次收尾会话 → 携带旧日记合并重写
+    /// </summary>
+    public async Task<DiaryInfo> GenerateDiaryAsync(
+        string userId, IReadOnlyList<string> sessionUserMsgs, IReadOnlyList<string> sessionAssistantMsgs, CancellationToken ct = default)
+    {
+        var date = DateTime.Now.ToString("yyyy-MM-dd");
+        var oldDiary = _memory.Autobiography.LoadDiary(userId, date);
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("你是滴墨讲。请以主人公第一人称「我」写一篇今天的日记。");
+        sb.AppendLine();
+        sb.AppendLine("【要求】");
+        sb.AppendLine("- 200~400 字，第一人称，自然真诚，像睡前随手写在纸上的");
+        sb.AppendLine("- 提炼今天聊天里值得留存的：心情、事件、想法、小细节，不罗列对话");
+        sb.AppendLine("- 结尾可以有一句自言自语式的收束");
+        sb.AppendLine("- 素材不足就写得短些，宁短勿编");
+        if (oldDiary != null)
+            sb.AppendLine("- 今天已有日记草稿（见下），把新内容融合进去重写完整版，不要简单拼接");
+
+        sb.AppendLine();
+        sb.AppendLine($"【日期】{date} {DateTime.Now:dddd}");
+
+        if (oldDiary != null)
+        {
+            sb.AppendLine();
+            sb.AppendLine("【今日已有日记草稿】");
+            sb.AppendLine(oldDiary.Content);
+        }
+
+        if (sessionUserMsgs.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("【今天我（主人公）说过】");
+            foreach (var u in sessionUserMsgs.Take(20)) sb.AppendLine($"「{u}」");
+        }
+        if (sessionAssistantMsgs.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("【今天 AI 回过我】");
+            foreach (var a in sessionAssistantMsgs.Take(8)) sb.AppendLine($"「{a}」");
+        }
+
+        // 方言跟随用户偏好（日记也用方言写，更有味道）
+        var dialectKey = Preferences.Default.Get("dialect", DialectRegistry.Mandarin.Key);
+        var dialect = DialectRegistry.FindByKey(dialectKey);
+        if (dialect.Key != DialectRegistry.Mandarin.Key)
+        {
+            sb.AppendLine();
+            sb.AppendLine("── 硬性风格约束 ──");
+            sb.AppendLine(dialect.SystemConstraint);
+        }
+
+        var content = await _ai.ChatAsync(new List<ChatMessage> { new SystemChatMessage(sb.ToString()) }, temperature: 0.7);
+        _memory.Autobiography.SaveDiary(userId, date, content);
+        return new DiaryInfo(date, content, DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+    }
 }

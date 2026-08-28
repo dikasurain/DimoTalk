@@ -50,6 +50,24 @@ public partial class ChatPage : ContentPage
         InkAnimations.Stop(_grindingHandle);
         InkAnimations.Stop(_sealBreathHandle);
         _sealBreathHandle = null;
+
+        // 会话收尾：中期记忆摘要 + 当日日记（fire-and-forget，失败静默）
+        _ = FinalizeSessionSafeAsync();
+    }
+
+    private async Task FinalizeSessionSafeAsync()
+    {
+        try
+        {
+            if (_chatService == null) return;
+            var userId = Preferences.Get("user_id", Guid.NewGuid().ToString());
+            Preferences.Set("user_id", userId);
+            await _chatService.FinalizeSessionAsync($"conv_{DateTime.Now:yyyyMMdd}", userId);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"会话收尾失败: {ex.Message}");
+        }
     }
 
     protected override void OnAppearing()

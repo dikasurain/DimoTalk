@@ -12,11 +12,13 @@ public class ChatService
 
     private readonly MemoryManager _memoryManager;
     private readonly OpenAIClient _ai;
+    private readonly AutobiographyService? _autobiography;
 
-    public ChatService(MemoryManager memoryManager, OpenAIClient ai)
+    public ChatService(MemoryManager memoryManager, OpenAIClient ai, AutobiographyService? autobiography = null)
     {
         _memoryManager = memoryManager;
         _ai = ai;
+        _autobiography = autobiography;
     }
 
     public async Task<string> SendMessageAsync(string userId, string userInput, bool forceCasual = false)
@@ -93,5 +95,22 @@ public class ChatService
 
         var summary = await _ai.SummarizeConversationAsync(userMsgs, assistantMsgs);
         await _memoryManager.OnSessionEndAsync(conversationId, userId, summary);
+
+        // 自动生成/合并当日日记（fire-and-forget，失败静默不打扰用户）
+        if (_autobiography != null && userMsgs.Count > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _autobiography.GenerateDiaryAsync(userId, userMsgs, assistantMsgs);
+                    System.Diagnostics.Debug.WriteLine("当日日记已生成/合并");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"日记生成失败: {ex.Message}");
+                }
+            });
+        }
     }
 }
