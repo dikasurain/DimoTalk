@@ -39,7 +39,7 @@ public class VoskWakeWordDetector : IWakeWordDetector
         return candidate;
     }
 
-    /// <summary>Android 首次启动从 APK 资源解压 Vosk 模型</summary>
+    /// <summary>Android 首次启动从 APK 资源解压 Vosk 模型（遍历目录全部解压，不硬编码文件列表）</summary>
     public async Task EnsureModelExtractedAsync()
     {
 #if WINDOWS
@@ -47,41 +47,71 @@ public class VoskWakeWordDetector : IWakeWordDetector
         return;
 #else
         var destDir = Path.Combine(FileSystem.AppDataDirectory, ModelDirName);
-        if (Directory.Exists(destDir) && Directory.GetFileSystemEntries(destDir).Length > 0)
+
+        // 验证解压完整性 — 检查关键文件是否存在
+        string[] requiredFiles = new[]
+        {
+            "am/final.mdl",
+            "ivector/final.mat",   // ← 缺这个会 SIGSEGV
+            "graph/HCLr.fst",
+            "conf/model.conf",
+        };
+        if (Directory.Exists(destDir) && requiredFiles.All(f => File.Exists(Path.Combine(destDir, f))))
         {
             _modelPath = destDir;
             return;
         }
+
+        // 之前解压不完整 — 删掉重来
+        try { Directory.Delete(destDir, true); } catch { }
         Directory.CreateDirectory(destDir);
 
-        // 尝试从 APK assets 解压
+        // 遍历 APK assets 解压整个模型目录
         try
         {
-            var expected = new[]
+            using var assets = Android.App.Application.Context!.Assets!;
+            var rootFiles = assets.List(ModelDirName);
+            if (rootFiles != null)
             {
-                "am/final.mdl", "am/tree",
-                "conf/mfcc.conf", "conf/model.conf",
-                "graph/HCLG.fst", "graph/HCLR.fst", "graph/HLG.fst", "graph/HLR.fst", "graph/LG.fst", "graph/RLG.fst", "graph/words.txt",
-                "ivector/final.dubm", "ivector/final.ie", "ivector/final.mda", "ivector/final.ubm",
-                "ivector/global_cmvn.stats", "ivector/online_cmvn.conf",
-            };
-            foreach (var rel in expected)
-            {
-                try
-                {
-                    using var stream = await FileSystem.OpenAppPackageFileAsync($"{ModelDirName}/{rel}");
-                    var dest = Path.Combine(destDir, rel);
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    using var fs = File.Create(dest);
-                    await stream.CopyToAsync(fs);
-                }
-                catch { /* 单文件缺失跳过 */ }
+                await ExtractAssetDirAsync(assets, ModelDirName, destDir);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Vosk 模型解压失败: {ex.Message}");
+        }
 
         _modelPath = destDir;
         await Task.CompletedTask;
+
+        static async Task ExtractAssetDirAsync(Android.Content.Res.AssetManager assets, string assetPath, string destPath)
+        {
+            // Assets.List 返回当前目录下的文件和子目录名
+            var entries = assets.List(assetPath);
+            if (entries == null || entries.Length == 0) return;
+
+            foreach (var entry in entries)
+            {
+                var fullAssetPath = $"{assetPath}/{entry}";
+                var fullDestPath = Path.Combine(destPath, entry);
+
+                // 检查是目录还是文件：尝试 Open，如果能打开就是文件，否则是目录
+                try
+                {
+                    using var stream = assets.Open(fullAssetPath);
+                    // 能打开 → 文件
+                    Directory.CreateDirectory(Path.GetDirectoryName(fullDestPath)!);
+                    using var fs = File.Create(fullDestPath);
+                    await stream.CopyToAsync(fs);
+                }
+                catch (Java.IO.FileNotFoundException)
+                {
+                    // 目录 → 递归
+                    Directory.CreateDirectory(fullDestPath);
+                    await ExtractAssetDirAsync(assets, fullAssetPath, fullDestPath);
+                }
+            }
+        }
 #endif
     }
 

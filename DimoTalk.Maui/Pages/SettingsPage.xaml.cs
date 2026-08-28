@@ -7,6 +7,7 @@ public partial class SettingsPage : ContentPage
 {
     private UserAiConfig _config = UserAiConfig.Load();
     private DialectInfo? _currentDialect;
+    private const string ScrollPosKey = "settings_scroll_y";
 
     public SettingsPage()
     {
@@ -47,6 +48,22 @@ public partial class SettingsPage : ContentPage
         // 语音设置
         WakeWordEntry.Text = Preferences.Get("wake_word", "滴墨");
         VoiceWakeSwitch.IsToggled = Preferences.Get("voice_wake_enabled", false);
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        // 恢复上次滚动位置
+        var y = Preferences.Get(ScrollPosKey, 0.0);
+        if (y > 0)
+            _ = RootScrollView.ScrollToAsync(0, y, false);
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        // 保存滚动位置
+        Preferences.Set(ScrollPosKey, RootScrollView.ScrollY);
     }
 
     private void OnProviderChanged(object? sender, EventArgs e)

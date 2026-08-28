@@ -166,6 +166,15 @@ public class ContinuousAudioCapture : IAsyncDisposable
             (Android.Media.AudioSource)1, SampleRate,
             (Android.Media.ChannelIn)1, (Android.Media.Encoding)2, bufSize);
 
+        // 验证 AudioRecord 初始化成功（权限未授予时 State == Uninitialized）
+        if ((int)_audioRecord.State != 1)
+        {
+            _audioRecord.Release();
+            _audioRecord = null;
+            IsCapturing = false;
+            throw new InvalidOperationException("AudioRecord 初始化失败 — 请确认已授予麦克风权限");
+        }
+
         _audioRecord.StartRecording();
         _running = true;
 

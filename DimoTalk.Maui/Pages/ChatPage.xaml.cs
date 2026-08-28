@@ -50,6 +50,10 @@ public partial class ChatPage : ContentPage
         base.OnAppearing();
         if (_sealBreathHandle == null)
             _sealBreathHandle = InkAnimations.SealBreathing(SealBadge);
+
+        // 切 Tab 回来时滚到底部最新消息
+        if (_messages.Count > 0)
+            MessagesView.ScrollTo(_messages[^1], position: ScrollToPosition.End, animate: false);
     }
 
     private void RefreshList(bool scrollToEnd = true)
@@ -125,6 +129,16 @@ public partial class ChatPage : ContentPage
         {
             try
             {
+                // 运行时权限请求（Android 6.0+ 必须动态申请 RECORD_AUDIO）
+#if ANDROID
+                var status = await Permissions.RequestAsync<Permissions.Microphone>();
+                if (status != PermissionStatus.Granted)
+                {
+                    await DisplayAlert("需要麦克风权限", "请在系统设置中允许滴墨讲使用麦克风", "确定");
+                    return;
+                }
+#endif
+
                 var userId = Preferences.Get("user_id", Guid.NewGuid().ToString());
                 Preferences.Set("user_id", userId);
                 await _voiceManager.StartAsync(userId);

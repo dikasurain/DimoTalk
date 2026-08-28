@@ -5,7 +5,7 @@
              Title="设置"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <ScrollView Padding="16,12,16,24">
+    <ScrollView x:Name="RootScrollView" Padding="16,12,16,24">
         <VerticalStackLayout Spacing="8">
 
             <!-- ===== 卷轴标题 ===== -->
