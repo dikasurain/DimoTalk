@@ -143,6 +143,32 @@
                         <Switch x:Name="VoiceWakeSwitch" HorizontalOptions="End"
                                 OnColor="{StaticResource Cinnabar}"/>
                     </HorizontalStackLayout>
+
+                    <!-- ===== 唤醒词矫正子卡（grammar 约束 + 方言同音字） ===== -->
+                    <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}"/>
+                    <Label Text="唤醒词矫正" FontSize="12" FontAttributes="Bold"
+                           TextColor="{StaticResource InkMedium}"/>
+                    <Label Text="方言或同音字识别不准？把 Vosk 实际听到的字加入候选，下次唤醒只匹配这些字。" FontSize="11"
+                           TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="候选同音字（逗号分隔）" Style="{StaticResource FieldHint}"/>
+                        <Border Style="{StaticResource CardBorder}">
+                            <Entry x:Name="WakeAliasesEntry" Placeholder="地魔, 低莫, 堤默"
+                                   PlaceholderColor="{StaticResource InkFaint}"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   ClearButtonVisibility="WhileEditing"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <HorizontalStackLayout Spacing="8">
+                        <Button x:Name="TestWakeBtn" Text="🎙 听 5 秒" Clicked="OnTestWakeClicked"
+                                Style="{StaticResource GhostButton}" FontSize="12"
+                                HorizontalOptions="Fill"/>
+                        <Button x:Name="AddHeardBtn" Text="＋ 用此字" Clicked="OnAddHeardClicked"
+                                Style="{StaticResource GhostButton}" FontSize="12"
+                                HorizontalOptions="Fill" IsEnabled="False"/>
+                    </HorizontalStackLayout>
+                    <Label x:Name="HeardLabel" Text="（未识别到内容）" FontSize="11"
+                           TextColor="{StaticResource InkLight}" LineBreakMode="WordWrap"/>
                 </VerticalStackLayout>
             </Border>
 
@@ -173,6 +199,16 @@
                         HorizontalOptions="Fill" FontSize="15"/>
                 <Button Text="重置" Clicked="OnResetClicked" Style="{StaticResource GhostButton}"/>
             </HorizontalStackLayout>
+
+            <!-- ===== 语音链路自测（诊断） ===== -->
+            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}" Margin="0,20,0,8"/>
+            <Label Text="语音链路自测" Style="{StaticResource SectionHeader}"/>
+            <Border Style="{StaticResource CardBorder}" Margin="0,4,0,0">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="选择一段音频（mp3/wav），直接走 完整链路：识别 → 回复 → 播放。用于定位语音闪退。" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    <Button Text="🧪 选择音频并自测" Clicked="OnAudioTestClicked" Style="{StaticResource GhostButton}"/>
+                </VerticalStackLayout>
+            </Border>
 
             <!-- ===== 记忆系统说明 ===== -->
             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}" Margin="0,20,0,8"/>

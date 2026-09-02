@@ -86,9 +86,24 @@ public class VoiceConversationManager : IAsyncDisposable
         // 1️⃣ 启动单一音频采集源（持有麦克风，全程不释放）
         await _capture.StartAsync();
 
-        // 2️⃣ 设置唤醒词
+        // 2️⃣ 设置唤醒词 + 候选同音字（方言矫正）
         var wakeWord = Preferences.Default.Get("wake_word", "滴墨");
         _wakeWordDetector.WakeWord = wakeWord;
+        if (_wakeWordDetector is VoskWakeWordDetector vosk2)
+        {
+            vosk2.Aliases.Clear();
+            var aliases = Preferences.Default.Get("wake_word_aliases", string.Empty);
+            if (!string.IsNullOrWhiteSpace(aliases))
+            {
+                foreach (var a in aliases.Split(',', ';')
+                             .Select(s => s.Trim())
+                             .Where(s => !string.IsNullOrEmpty(s)))
+                    vosk2.Aliases.Add(a);
+            }
+            // 默认至少把唤醒词本身加入候选，保证 grammar 模式能识别
+            if (vosk2.Aliases.Count == 0)
+                vosk2.Aliases.Add(wakeWord);
+        }
 
         // 3️⃣ 解压 Vosk 模型（首次）
         if (_wakeWordDetector is VoskWakeWordDetector vosk)
@@ -212,6 +227,9 @@ public class VoiceConversationManager : IAsyncDisposable
     // ─────────── 录音完成回调 ───────────
 
     private async void OnRecordingCompleted(object? sender, byte[] wavBytes)
+        => await ProcessReplyAsync(wavBytes);
+
+    private async Task ProcessReplyAsync(byte[] wavBytes)
     {
         try
         {
@@ -227,6 +245,9 @@ public class VoiceConversationManager : IAsyncDisposable
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"ASR 失败: {ex.Message}");
+                EmitStatus(ex.Message.Contains("不支持")
+                    ? "当前服务商不支持语音识别 · 详见设置页"
+                    : "没听清 · 可再喊一声唤醒词");
                 text = string.Empty;
             }
 
@@ -327,6 +348,13 @@ public class VoiceConversationManager : IAsyncDisposable
     }
 
     // ─────────── 辅助 ───────────
+
+    /// <summary>
+    /// 音频自测入口：跳过录音，把指定音频直接送入完整回复链路（ASR → GPT → TTS → 播放）
+    /// 用于模拟器复现"说完话等回复时闪退"问题
+    /// </summary>
+    public Task TestWithAudioAsync(byte[] audioBytes)
+        => ProcessReplyAsync(audioBytes);
 
     private async Task PlayPromptToneAsync()
     {

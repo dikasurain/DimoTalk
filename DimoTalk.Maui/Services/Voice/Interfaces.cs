@@ -27,6 +27,15 @@ public interface IWakeWordDetector : IAsyncDisposable
     /// <summary>设置匹配的唤醒词（如"滴墨"、"dimotalk"）</summary>
     string WakeWord { get; set; }
 
+    /// <summary>
+    /// 唤醒词候选列表（含方言同音字）。例如 ["滴墨","地魔","低莫"]。
+    /// 留空时回退到仅 WakeWord 本字。Vosk grammar 模式下限制识别结果只能落在这些词中。
+    /// </summary>
+    IList<string> Aliases { get; }
+
+    /// <summary>实时识别到文字（partial result）时触发，用于调试页显示 Vosk 实际听到了什么</summary>
+    event EventHandler<string>? PartialResultReceived;
+
     /// <summary>启动持续监听，回调在每次检测到关键词时触发</summary>
     Task StartAsync(Func<Task> onWakeWordDetected, CancellationToken ct);
 

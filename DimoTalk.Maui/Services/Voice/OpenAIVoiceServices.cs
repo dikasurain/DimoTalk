@@ -22,7 +22,9 @@ public class WhisperAsrService : IAsrService
 
         var client = AiClientFactory.CreateAudioClient(config, forTts: false);
         using var stream = new MemoryStream(wavBytes);
-        var transcription = await client.TranscribeAudioAsync(stream, "recording.wav");
+        // 根据字节头判断扩展名：RIFF→wav，其余按 mp3 传（文件名不符 OpenAI 会拒收）
+        var isWav = wavBytes.Length > 12 && wavBytes[0] == 'R' && wavBytes[1] == 'I';
+        var transcription = await client.TranscribeAudioAsync(stream, isWav ? "recording.wav" : "recording.mp3");
         return transcription.Value.Text;
     }
 }

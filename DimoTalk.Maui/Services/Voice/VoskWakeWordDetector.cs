@@ -10,6 +10,7 @@ public class VoskWakeWordDetector : IWakeWordDetector
     private const string ModelDirName = "vosk-model-small-cn-0.22";
 
     private readonly ContinuousAudioCapture _capture;
+    private readonly object _voskLock = new();   // 保护 _rec 的 AcceptWaveform / Dispose 互斥
     private string _modelPath;
     private Model? _model;
     private VoskRecognizer? _rec;
@@ -19,6 +20,12 @@ public class VoskWakeWordDetector : IWakeWordDetector
 
     public string WakeWord { get; set; } = "滴墨";
 
+    /// <summary>唤醒词候选列表（含方言同音字）。运行时改变需重启监听才生效。</summary>
+    public IList<string> Aliases { get; } = new List<string>();
+
+    /// <summary>实时 partial result 文本（Vosk 听到的内容）。供调试页订阅。</summary>
+    public event EventHandler<string>? PartialResultReceived;
+
     public VoskWakeWordDetector(ContinuousAudioCapture capture)
         : this(capture, ResolveDefaultModelPath()) { }
 
@@ -27,6 +34,9 @@ public class VoskWakeWordDetector : IWakeWordDetector
         _capture = capture;
         _modelPath = modelPath;
     }
+
+    /// <summary>当前生效的识别词表（Aliases 非空用 Aliases，否则仅 WakeWord 本字）</summary>
+    private IList<string> EffectiveWords => (Aliases.Count > 0 ? Aliases : new[] { WakeWord });
 
     private static string ResolveDefaultModelPath()
     {
@@ -128,9 +138,21 @@ public class VoskWakeWordDetector : IWakeWordDetector
             Vosk.Vosk.SetLogLevel(-1);
         }
 
-        _rec = new VoskRecognizer(_model, 16000.0f);
-        _rec.SetMaxAlternatives(0);
-        _rec.AcceptWaveform(new byte[4096], 0); // reset
+        lock (_voskLock)
+        {
+            // 三合一改造核心：用 grammar 约束 Vosk 只识别候选词表
+            // Vosk 在 grammar 模式下不会输出任意汉字，只输出词表中的词或 [unk]
+            // 这把小模型识别不准/同音字干扰问题彻底根治
+            var words = EffectiveWords;
+            var grammarWords = words.Distinct().Select(w => $"\"{w}\"").ToList();
+            // 末尾占位 [unk]：让 Vosk 把非候选词归到未知桶，避免静默噪声误判为某候选
+            grammarWords.Add("\"[unk]\"");
+            string grammar = "[" + string.Join(", ", grammarWords) + "]";
+
+            _rec = new VoskRecognizer(_model, 16000.0f, grammar);
+            _rec.SetMaxAlternatives(0);
+            _rec.AcceptWaveform(new byte[4096], 0); // reset
+        }
 
         _onWake = onWakeWordDetected;
         _listening = true;
@@ -142,26 +164,40 @@ public class VoskWakeWordDetector : IWakeWordDetector
 
     private void OnPcmChunk(byte[] pcm)
     {
-        if (!_listening || _rec == null || _onWake == null) return;
+        if (!_listening || _onWake == null) return;
 
         try
         {
-            if (_rec.AcceptWaveform(pcm, pcm.Length))
+            // 与 StopAsync 的 Dispose 互斥 — 防止 recognizer 被释放后 JNI 访问导致 SIGSEGV
+            lock (_voskLock)
             {
-                var result = _rec.Result();
-                if (ContainsWakeWord(result))
+                var rec = _rec;
+                if (!_listening || rec == null) return;
+
+                if (rec.AcceptWaveform(pcm, pcm.Length))
                 {
-                    _ = _onWake();
-                    _listening = false; // 触发后由上层 StopAsync 清理
+                    var result = rec.Result();
+                    // 调试事件：让设置页能看到 Vosk 听到了什么
+                    var resultText = ExtractText(result);
+                    if (!string.IsNullOrEmpty(resultText))
+                        PartialResultReceived?.Invoke(this, resultText);
+                    if (ContainsWakeWord(result))
+                    {
+                        _listening = false; // 触发后由上层 StopAsync 清理
+                        _ = _onWake();
+                    }
                 }
-            }
-            else
-            {
-                var partial = _rec.PartialResult();
-                if (ContainsWakeWord(partial))
+                else
                 {
-                    _ = _onWake();
-                    _listening = false;
+                    var partial = rec.PartialResult();
+                    var partialText = ExtractText(partial);
+                    if (!string.IsNullOrEmpty(partialText))
+                        PartialResultReceived?.Invoke(this, partialText);
+                    if (ContainsWakeWord(partial))
+                    {
+                        _listening = false;
+                        _ = _onWake();
+                    }
                 }
             }
         }
@@ -171,19 +207,53 @@ public class VoskWakeWordDetector : IWakeWordDetector
         }
     }
 
+    /// <summary>
+    /// 匹配逻辑：文本中是否包含任一候选词（Aliases 非空）或唤醒词本身。
+    /// grammar 模式下 Vosk 只会输出候选词或 [unk]，所以这里是简单的字符串包含。
+    /// 但仍保留对 partial 中的"未约束"输出兼容（如用户未配置 Aliases 时回退自由识别）。
+    /// </summary>
     private bool ContainsWakeWord(string json)
     {
         if (string.IsNullOrEmpty(json)) return false;
-        return json.Replace(" ", "").Contains(WakeWord);
+        var compact = json.Replace(" ", "").Replace("[unk]", "");
+        foreach (var w in EffectiveWords)
+        {
+            if (!string.IsNullOrEmpty(w) && compact.Contains(w)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>从 Vosk JSON 结果中提取 "text" / "partial" 字段的纯文本</summary>
+    private static string ExtractText(string json)
+    {
+        if (string.IsNullOrEmpty(json)) return string.Empty;
+        // 简易提取：Vosk 输出形如 {"text":"你好"} 或 {"partial":"滴墨"}
+        // 避免引入 System.Text.Json 反序列化开销，直接字符串切片
+        foreach (var key in new[] { "\"partial\"", "\"text\"" })
+        {
+            int k = json.IndexOf(key, StringComparison.Ordinal);
+            if (k < 0) continue;
+            int colon = json.IndexOf(':', k);
+            if (colon < 0) continue;
+            int start = colon + 1;
+            while (start < json.Length && (json[start] == ' ' || json[start] == '\"')) start++;
+            int end = start;
+            while (end < json.Length && json[end] != '\"') end++;
+            return json.Substring(start, end - start);
+        }
+        return string.Empty;
     }
 
     public Task StopAsync()
     {
-        if (!_listening) return Task.CompletedTask;
         _listening = false;
         _capture.Unsubscribe(OnPcmChunk);
-        try { _rec?.Dispose(); } catch { }
-        _rec = null;
+        // 与 OnPcmChunk 的 AcceptWaveform 互斥 — 确保 Dispose 时无回调正在使用 recognizer
+        lock (_voskLock)
+        {
+            try { _rec?.Dispose(); } catch { }
+            _rec = null;
+        }
         return Task.CompletedTask;
     }
 

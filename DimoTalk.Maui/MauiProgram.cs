@@ -87,7 +87,12 @@ public static class MauiProgram
             var auto = sp.GetService<AutobiographyService>();
             return new MemoryPage(MemoryInstance, auto, ai, () => Preferences.Get("openai_api_key", string.Empty));
         });
-        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<SettingsPage>(sp =>
+        {
+            var wake = sp.GetService<IWakeWordDetector>();
+            var capture = sp.GetService<ContinuousAudioCapture>();
+            return new SettingsPage(wake, capture);
+        });
 
         var app = builder.Build();
         return app;
